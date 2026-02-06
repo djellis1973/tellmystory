@@ -2039,7 +2039,7 @@ if current_user:
         }
         json_data = json.dumps(enhanced_data, indent=2)
         encoded_data = base64.b64encode(json_data.encode()).decode()
-        publisher_url = f"https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/?data={encoded_data}"
+        publisher_url = f"https://tellmystory-jlav4zxitziswt6zwbxdzt.streamlit.app/?data={encoded_data}"
         st.success(f"✅ **{total_stories} stories** ready to publish!")
         
         col1, col2 = st.columns(2)
