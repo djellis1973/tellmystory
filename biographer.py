@@ -1,4 +1,4 @@
-# biographer.py – Tell My Story main app (CSV-ONLY Sessions Version)
+# biographer.py – Tell My Story App (Complete Working Version)
 import streamlit as st
 import json
 from datetime import datetime, date, timedelta
@@ -2011,88 +2011,95 @@ with col4:
         except:
             st.metric("Total Photos", "0")
 
-# Publish & Save Biography
+# ============================================================================
+# SECTION: BIOGRAPHY FORMATTER EXPORT (FROM ORIGINAL WORKING APP)
+# ============================================================================
 st.divider()
-st.subheader("📘 Publish & Save Your Biography")
-current_user = st.session_state.get('user_id', '')
-if current_user:
-    export_data = {}
-    for session in SESSIONS:
-        session_id = session["id"]
-        session_data = st.session_state.responses.get(session_id, {})
-        if session_data.get("questions"):
-            export_data[str(session_id)] = {
-                "title": session["title"],
-                "questions": session_data["questions"]
-            }
-    
-    if export_data:
-        total_stories = sum(len(session['questions']) for session in export_data.values())
-        enhanced_data = {
-            "user": current_user,
-            "stories": export_data,
-            "export_date": datetime.now().isoformat(),
-            "summary": {
-                "total_stories": total_stories,
-                "total_sessions": len(export_data)
-            }
-        }
-        json_data = json.dumps(enhanced_data, indent=2)
-        encoded_data = base64.b64encode(json_data.encode()).decode()
-        publisher_url = f"https://tellmystory-jlav4zxitziswt6zwbxdzt.streamlit.app/?data={encoded_data}"
-        st.success(f"✅ **{total_stories} stories** ready to publish!")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### 🖨️ Create Your Book")
-            st.markdown("""
-            Generate a beautiful, formatted biography.
-            Your book will include:
-            • Professional formatting
-            • Table of contents
-            • All your stories organized
-            • Ready to print or share
-            """)
-            st.markdown(f'''
-            <a href="{publisher_url}" target="_blank">
-            <button class="html-link-btn">
-            🖨️ Publish Biography
-            </button>
-            </a>
-            ''', unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("#### 🔐 Save to Your Vault")
-            st.markdown("""
-            **Complete preservation:**
-            1. Generate your enhanced biography
-            2. Download the formatted PDF
-            3. Save all your stories
-            4. Store in your secure digital vault
-            """)
-            vault_url = "https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/"
-            st.markdown(f'''
-            <a href="{vault_url}" target="_blank">
-            <button style="background: #3498db; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 1rem;">
-            💾 Go to Secure Vault
-            </button>
-            </a>
-            ''', unsafe_allow_html=True)
-            with st.expander("📥 Download Backup"):
-                st.download_button(
-                    label="Download Complete Data",
-                    data=json_data,
-                    file_name=f"{current_user}_complete_backup.json",
-                    mime="application/json",
-                    use_container_width=True,
-                    key="backup_download_btn"
-                )
-                st.caption("Includes all your stories")
-    else:
-        st.info("📝 **Start writing your story!** Answer some questions first, then come back here.")
-else:
-    st.info("👤 **Please log in to publish your biography**")
+st.subheader("📘 Biography Formatter")
 
+# Get the current user's data
+current_user = st.session_state.get('user_id', '')
+export_data = {}
+
+# Prepare data for export (EXACTLY like original app)
+for session in SESSIONS:
+    session_id = session["id"]
+    session_data = st.session_state.responses.get(session_id, {})
+    if session_data.get("questions"):
+        export_data[str(session_id)] = {
+            "title": session["title"],
+            "questions": session_data["questions"]
+        }
+
+if current_user and current_user != "" and export_data:
+    # Count total stories (matching original app logic)
+    total_stories = sum(len(session['questions']) for session in export_data.values())
+    
+    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP
+    json_data = json.dumps({
+        "user": current_user,
+        "stories": export_data,
+        "export_date": datetime.now().isoformat()
+    }, indent=2)
+    
+    # Encode the data for URL
+    encoded_data = base64.b64encode(json_data.encode()).decode()
+    
+    # USE THE ORIGINAL URL FROM YOUR WORKING APP
+    publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
+    publisher_url = f"{publisher_base_url}?data={encoded_data}"
+    
+    st.success(f"✅ **{total_stories} stories ready for formatting!**")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 🖨️ Format Biography")
+        st.markdown(f"""
+        Generate a professionally formatted biography from your stories.
+        
+        **[📘 Click to Format Biography]({publisher_url})**
+        
+        Your formatted biography will include:
+        • Professional formatting
+        • Table of contents
+        • All your stories organized
+        • Ready to print or share
+        """)
+    
+    with col2:
+        st.markdown("#### 🔐 Save to Your Vault")
+        st.markdown("""
+        **After formatting your biography:**
+        
+        1. Generate your biography (link on left)
+        2. Download the formatted PDF
+        3. Save it to your secure vault
+        
+        **[💾 Go to Secure Vault](https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/)**
+        
+        Your vault preserves important documents forever.
+        """)
+    
+    # Backup download (exactly like original app)
+    with st.expander("📥 Download Raw Data (Backup)"):
+        st.download_button(
+            label="Download Stories as JSON",
+            data=json_data,
+            file_name=f"{current_user}_stories.json",
+            mime="application/json",
+            use_container_width=True
+        )
+        st.caption("Use this if the formatter link doesn't work")
+        
+elif current_user and current_user != "":
+    st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
+else:
+    st.info("👤 **Please log in to format your biography**")
+
+# ============================================================================
+# FOOTER
+# ============================================================================
 st.markdown("---")
 if st.session_state.user_account:
     profile = st.session_state.user_account['profile']
