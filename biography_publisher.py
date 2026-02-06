@@ -127,3 +127,4 @@ else:
 
 st.markdown("---")
 st.caption("Biography Publisher - No login required")
+
