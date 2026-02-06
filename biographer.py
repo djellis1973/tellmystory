@@ -58,7 +58,7 @@ except FileNotFoundError:
     st.warning("styles.css not found – layout may look broken")
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/02/tell_my_story_logo.png"
+LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo.png"
 
 # ── Sessions ──────────────────────────────────────────────────────────────────
 SESSIONS = [
