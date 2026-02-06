@@ -6,19 +6,14 @@ session_id,title,guidance,question,word_target
 1,Childhood,,Were there any favourite games or hobbies?,800
 1,Childhood,,Is there a moment from childhood that shaped who you are?,800
 1,Childhood,,If you could give your younger self some advice, what would it be?,800
-2,Family & Relationships,"Welcome to Session 2: Family & Relationships—this is where we explore the people who shaped you. Family stories are complex ecosystems. We're not seeking perfect narratives, but authentic ones. The richest material often lives in the tensions, the unsaid things, the small rituals. My job is to help you articulate what usually goes unspoken. Think in scenes rather than summaries.",How would you describe your relationship with your parents?,700
-2,Family & Relationships,,Are there any family traditions you remember fondly?,700
-2,Family & Relationships,,What was your relationship like with siblings or close relatives?,700
-2,Family & Relationships,,Can you share a story about a family celebration or challenge?,700
-2,Family & Relationships,,How did your family shape your values?,700
-3,Education & Growing Up,"Welcome to Session 3: Education & Growing Up—this is where we explore how you learned to navigate the world. Education isn't just about schools—it's about how you learned to navigate the world. We're interested in the hidden curriculum: what you learned about yourself, about systems, about survival and growth. Think beyond grades to transformation.",What were your favourite subjects at school?,600
-3,Education & Growing Up,,Did you have any memorable teachers or mentors?,600
-3,Education & Growing Up,,How did you feel about exams and studying?,600
-3,Education & Growing Up,,Were there any big turning points in your education?,600
-3,Education & Growing Up,,Did you pursue further education or training?,600
-3,Education & Growing Up,,What advice would you give about learning?,600
-4,Work & Career,"Welcome to Session 4: Work & Career—this is where we explore your professional journey. Careers are rarely linear. We're interested in the turning points, the mentors, the challenges overcome, and what your work meant to you beyond the paycheck.",What was your first job?,600
-4,Work & Career,,What career path did you envision for yourself?,600
-4,Work & Career,,Who were your most important mentors?,600
-5,Life Philosophy,"Welcome to Session 5: Life Philosophy—this is where we explore the beliefs and values that guide you. What matters most? What have you learned about life? What wisdom would you pass on?",What are your core values?,600
-5,Life Philosophy,,What life lessons have been most important?,600
+2,"Family & Relationships","Welcome to Session 2: Family & Relationships—this is where we explore the people who shaped you. Family stories are complex ecosystems. We're not seeking perfect narratives, but authentic ones. The richest material often lives in the tensions, the unsaid things, the small rituals. My job is to help you articulate what usually goes unspoken. Think in scenes rather than summaries.",How would you describe your relationship with your parents?,700
+2,"Family & Relationships",,Are there any family traditions you remember fondly?,700
+2,"Family & Relationships",,What was your relationship like with siblings or close relatives?,700
+2,"Family & Relationships",,Can you share a story about a family celebration or challenge?,700
+2,"Family & Relationships",,How did your family shape your values?,700
+3,"Education & Growing Up","Welcome to Session 3: Education & Growing Up—this is where we explore how you learned to navigate the world. Education isn't just about schools—it's about how you learned to navigate the world. We're interested in the hidden curriculum: what you learned about yourself, about systems, about survival and growth. Think beyond grades to transformation.",What were your favourite subjects at school?,600
+3,"Education & Growing Up",,Did you have any memorable teachers or mentors?,600
+3,"Education & Growing Up",,How did you feel about exams and studying?,600
+3,"Education & Growing Up",,Were there any big turning points in your education?,600
+3,"Education & Growing Up",,Did you pursue further education or training?,600
+3,"Education & Growing Up",,What advice would you give about learning?,600
