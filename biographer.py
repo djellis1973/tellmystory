@@ -1541,7 +1541,7 @@ with st.sidebar:
             }
             json_data = json.dumps(complete_data, indent=2)
             encoded_data = base64.b64encode(json_data.encode()).decode()
-            publisher_url = f"https://tellmystory-jlav4zxitziswt6zwbxdzt.streamlit.app/?data={encoded_data}"
+            publisher_url = f"https://tellmystory-jlav4zxitziswt6zwbxdzt.streamlit.app/biography_publisher?data={encoded_data}"
             
             col1, col2 = st.columns(2)
             with col1:
