@@ -1,4 +1,4 @@
-# biographer.py – Tell My Story main app (FULLY UPDATED)
+# biographer.py – Tell My Story main app (CSV-ONLY Sessions Version)
 import streamlit as st
 import json
 from datetime import datetime, date, timedelta
@@ -60,54 +60,105 @@ except FileNotFoundError:
 # ── Constants ─────────────────────────────────────────────────────────────────
 LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo.png"
 
-# ── Sessions ──────────────────────────────────────────────────────────────────
-SESSIONS = [
-    {
-        "id": 1,
-        "title": "Childhood",
-        "guidance": "Welcome to Session 1: Childhood—this is where we lay the foundation of your story. Professional biographies thrive on specific, sensory-rich memories. I'm looking for the kind of details that transport readers: not just what happened, but how it felt, smelled, sounded. The 'insignificant' moments often reveal the most. Take your time—we're mining for gold here.",
-        "questions": [
-            "What is your earliest memory?",
-            "Can you describe your family home growing up?",
-            "Who were the most influential people in your early years?",
-            "What was school like for you?",
-            "Were there any favourite games or hobbies?",
-            "Is there a moment from childhood that shaped who you are?",
-            "If you could give your younger self some advice, what would it be?"
-        ],
-        "completed": False,
-        "word_target": 800
-    },
-    {
-        "id": 2,
-        "title": "Family & Relationships",
-        "guidance": "Welcome to Session 2: Family & Relationships—this is where we explore the people who shaped you. Family stories are complex ecosystems. We're not seeking perfect narratives, but authentic ones. The richest material often lives in the tensions, the unsaid things, the small rituals. My job is to help you articulate what usually goes unspoken. Think in scenes rather than summaries.",
-        "questions": [
-            "How would you describe your relationship with your parents?",
-            "Are there any family traditions you remember fondly?",
-            "What was your relationship like with siblings or close relatives?",
-            "Can you share a story about a family celebration or challenge?",
-            "How did your family shape your values?"
-        ],
-        "completed": False,
-        "word_target": 700
-    },
-    {
-        "id": 3,
-        "title": "Education & Growing Up",
-        "guidance": "Welcome to Session 3: Education & Growing Up—this is where we explore how you learned to navigate the world. Education isn't just about schools—it's about how you learned to navigate the world. We're interested in the hidden curriculum: what you learned about yourself, about systems, about survival and growth. Think beyond grades to transformation.",
-        "questions": [
-            "What were your favourite subjects at school?",
-            "Did you have any memorable teachers or mentors?",
-            "How did you feel about exams and studying?",
-            "Were there any big turning points in your education?",
-            "Did you pursue further education or training?",
-            "What advice would you give about learning?"
-        ],
-        "completed": False,
-        "word_target": 600
-    }
-]
+# ── Sessions (ONLY FROM CSV - NO HARDCODING) ─────────────────────────────────
+def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
+    """Load sessions ONLY from CSV file - NO hardcoded fallback"""
+    try:
+        import pandas as pd
+        import os
+        
+        # Create sessions directory if it doesn't exist
+        os.makedirs(os.path.dirname(csv_path) if os.path.dirname(csv_path) else '.', exist_ok=True)
+        
+        if not os.path.exists(csv_path):
+            # CSV doesn't exist - show error and return empty list
+            st.error(f"❌ Sessions CSV file not found: {csv_path}")
+            st.info("""
+            Please create a `sessions/sessions.csv` file with this format:
+            
+            session_id,title,guidance,question,word_target
+            1,Childhood,"Welcome to Session 1...","What is your earliest memory?",500
+            1,Childhood,,"Can you describe your family home?",500
+            
+            Guidance only needs to be in the first row of each session.
+            """)
+            return []
+        
+        df = pd.read_csv(csv_path)
+        
+        # Check required columns
+        required_columns = ['session_id', 'question']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            st.error(f"❌ Missing required columns in CSV: {missing_columns}")
+            st.info("CSV must have at least: session_id, question")
+            return []
+        
+        # Group by session_id
+        sessions_dict = {}
+        
+        for session_id, group in df.groupby('session_id'):
+            session_id_int = int(session_id)
+            group = group.reset_index(drop=True)
+            
+            # Get title (use first row's title or default)
+            title = f"Session {session_id_int}"
+            if 'title' in group.columns and not group.empty:
+                first_title = group.iloc[0]['title']
+                if pd.notna(first_title) and str(first_title).strip():
+                    title = str(first_title).strip()
+            
+            # Get guidance (use first row's guidance)
+            guidance = ""
+            if 'guidance' in group.columns and not group.empty:
+                first_guidance = group.iloc[0]['guidance']
+                if pd.notna(first_guidance) and str(first_guidance).strip():
+                    guidance = str(first_guidance).strip()
+            
+            # Get word target (use first row's word_target or default to 500)
+            word_target = DEFAULT_WORD_TARGET
+            if 'word_target' in group.columns and not group.empty:
+                first_target = group.iloc[0]['word_target']
+                if pd.notna(first_target):
+                    try:
+                        word_target = int(float(first_target))
+                    except:
+                        word_target = DEFAULT_WORD_TARGET
+            
+            # Get all questions
+            questions = []
+            for _, row in group.iterrows():
+                if 'question' in row and pd.notna(row['question']) and str(row['question']).strip():
+                    questions.append(str(row['question']).strip())
+            
+            # Only add session if it has questions
+            if questions:
+                sessions_dict[session_id_int] = {
+                    "id": session_id_int,
+                    "title": title,
+                    "guidance": guidance,
+                    "questions": questions,
+                    "completed": False,
+                    "word_target": word_target
+                }
+        
+        # Convert to list and sort by session_id
+        sessions_list = list(sessions_dict.values())
+        sessions_list.sort(key=lambda x: x['id'])
+        
+        if not sessions_list:
+            st.warning("⚠️ No sessions found in CSV file")
+            return []
+        
+        st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
+        return sessions_list
+        
+    except Exception as e:
+        st.error(f"❌ Error loading sessions from CSV: {e}")
+        return []
+
+# Load sessions ONCE at startup
+SESSIONS = load_sessions_from_csv()
 
 # ── Historical events – CSV only ──────────────────────────────────────────────
 def create_default_events_csv():
@@ -429,6 +480,10 @@ def save_jot(text, estimated_year=None):
 
 # ── Prompt Builder ────────────────────────────────────────────────────────────
 def get_system_prompt():
+    # Check if we have sessions loaded
+    if not SESSIONS or st.session_state.current_session >= len(SESSIONS):
+        return "No sessions available. Please check your CSV file."
+    
     current_session = SESSIONS[st.session_state.current_session]
     current_question = (
         st.session_state.current_question_override
@@ -539,13 +594,26 @@ def save_response(session_id, question, answer):
         save_account_data(st.session_state.user_account)
     
     if session_id not in st.session_state.responses:
-        s = SESSIONS[session_id-1]
+        # Find the session in SESSIONS
+        session_data = None
+        for s in SESSIONS:
+            if s["id"] == session_id:
+                session_data = s
+                break
+        
+        if not session_data:
+            # Create a basic session entry if not found
+            session_data = {
+                "title": f"Session {session_id}",
+                "word_target": DEFAULT_WORD_TARGET
+            }
+        
         st.session_state.responses[session_id] = {
-            "title": s["title"],
+            "title": session_data.get("title", f"Session {session_id}"),
             "questions": {},
             "summary": "",
             "completed": False,
-            "word_target": s.get("word_target", DEFAULT_WORD_TARGET)
+            "word_target": session_data.get("word_target", DEFAULT_WORD_TARGET)
         }
     
     st.session_state.responses[session_id]["questions"][question] = {
@@ -834,7 +902,8 @@ def show_session_creator():
     
     st.title("📋 Create Custom Session")
     
-    session_manager = SessionManager(SESSIONS, st.session_state.user_id)
+    # Initialize SessionManager with CSV path
+    session_manager = SessionManager(st.session_state.user_id, "sessions/sessions.csv")
     session_manager.display_session_creator()
     
     st.markdown('</div>', unsafe_allow_html=True)
@@ -853,24 +922,24 @@ def show_session_manager():
     
     st.title("📖 Session Manager")
     
-    session_manager = SessionManager(SESSIONS, st.session_state.user_id)
+    # Initialize SessionManager with CSV path
+    session_manager = SessionManager(st.session_state.user_id, "sessions/sessions.csv")
     
     def on_session_select(session_id):
         all_sessions = session_manager.get_all_sessions()
         for i, session in enumerate(all_sessions):
             if session["id"] == session_id:
-                # Update current session index
-                custom_sessions = all_sessions[len(SESSIONS):]
-                if session in custom_sessions:
-                    # It's a custom session
-                    custom_index = custom_sessions.index(session)
-                    st.session_state.current_session = len(SESSIONS) + custom_index
+                # Find session index in SESSIONS
+                for j, standard_session in enumerate(SESSIONS):
+                    if standard_session["id"] == session_id:
+                        st.session_state.current_session = j
+                        break
                 else:
-                    # It's a standard session
-                    for j, standard_session in enumerate(SESSIONS):
-                        if standard_session["id"] == session_id:
-                            st.session_state.current_session = j
-                            break
+                    # It's a custom session
+                    custom_sessions = all_sessions[len(SESSIONS):]
+                    if session in custom_sessions:
+                        custom_index = custom_sessions.index(session)
+                        st.session_state.current_session = len(SESSIONS) + custom_index
                 
                 st.session_state.current_question = 0
                 st.session_state.current_question_override = None
@@ -948,17 +1017,20 @@ for key, value in default_state.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
-if not st.session_state.responses:
+# Initialize responses for loaded sessions
+if SESSIONS:
     for session in SESSIONS:
         session_id = session["id"]
-        st.session_state.responses[session_id] = {
-            "title": session["title"],
-            "questions": {},
-            "summary": "",
-            "completed": False,
-            "word_target": session.get("word_target", DEFAULT_WORD_TARGET)
-        }
-        st.session_state.session_conversations[session_id] = {}
+        if session_id not in st.session_state.responses:
+            st.session_state.responses[session_id] = {
+                "title": session["title"],
+                "questions": {},
+                "summary": "",
+                "completed": False,
+                "word_target": session.get("word_target", DEFAULT_WORD_TARGET)
+            }
+        if session_id not in st.session_state.session_conversations:
+            st.session_state.session_conversations[session_id] = {}
 
 if st.session_state.logged_in and st.session_state.user_id and not st.session_state.data_loaded:
     user_data = load_user_data(st.session_state.user_id)
@@ -1157,6 +1229,21 @@ def show_profile_setup_modal():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Main App Flow ─────────────────────────────────────────────────────────────
+# Check if sessions are loaded
+if not SESSIONS:
+    st.error("❌ No sessions loaded. Please create a sessions/sessions.csv file.")
+    st.info("""
+    Create a CSV file with this format:
+    
+    session_id,title,guidance,question,word_target
+    1,Childhood,"Welcome to Session 1...","What is your earliest memory?",500
+    1,Childhood,,"Can you describe your family home?",500
+    2,Family,"Welcome to Session 2...","How would you describe your relationship?",500
+    
+    Save it as: sessions/sessions.csv
+    """)
+    st.stop()
+
 if st.session_state.get('show_profile_setup', False):
     show_profile_setup_modal()
     st.stop()
@@ -1551,6 +1638,10 @@ with st.sidebar:
                 st.rerun()
 
 # ── Main Content Area ─────────────────────────────────────────────────────────
+# Check if we have a valid current session
+if st.session_state.current_session >= len(SESSIONS):
+    st.session_state.current_session = 0
+
 current_session = SESSIONS[st.session_state.current_session]
 current_session_id = current_session["id"]
 
@@ -1558,6 +1649,9 @@ if st.session_state.current_question_override:
     current_question_text = st.session_state.current_question_override
     question_source = "custom"
 else:
+    # Check if current_question is valid
+    if st.session_state.current_question >= len(current_session["questions"]):
+        st.session_state.current_question = 0
     current_question_text = current_session["questions"][st.session_state.current_question]
     question_source = "regular"
 
