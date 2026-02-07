@@ -1985,12 +1985,19 @@ with image_controls_container:
             st.session_state.show_image_upload = not st.session_state.show_image_upload
             st.rerun()
     
-    with img_col2:
-        if has_images:
-            if st.button("✨ Tell Photo Stories", key="photo_stories_btn", use_container_width=True, type="primary"):
-                # Enable photo story mode
-                st.session_state.image_prompt_mode = True
-                st.session_state.selected_images_for_prompt = session_images
+with img_col2:
+    if has_images:
+        if st.button("✨ Tell Photo Stories", key="photo_stories_btn", use_container_width=True, type="primary"):
+            # ENABLE PHOTO MODE
+            st.session_state.image_prompt_mode = True
+            st.session_state.selected_images_for_prompt = session_images
+            
+            # FORCE NEW CONVERSATION ABOUT PHOTOS
+            if current_question_text in st.session_state.session_conversations.get(current_session_id, {}):
+                st.session_state.session_conversations[current_session_id][current_question_text] = []
+            
+            st.success(f"📸 Photo Story Mode: Ready to discuss {len(session_images)} photo(s)!")
+            st.rerun()
                 
                 # Force a conversation reset to trigger AI photo questions
                 if current_question_text in st.session_state.session_conversations.get(current_session_id, {}):
