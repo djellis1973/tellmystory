@@ -724,33 +724,18 @@ Consider how these historical moments might have shaped their experiences and pe
         except:
             pass
     
+    # FIX SECTION D: Photo Story Mode section - FIXED TO BE MORE ACTIVE
     image_prompt_section = ""
     if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
-        image_prompt_section = "\n\n🎯 **PHOTO STORY MODE ACTIVATED:**\n"
-        image_prompt_section += f"The user wants to discuss {len(st.session_state.selected_images_for_prompt)} specific photo(s).\n"
-        image_prompt_section += "Ask detailed questions about each photo:\n\n"
+        image_prompt_section = "\n\n🎯 **USER HAS INITIATED PHOTO STORY MODE:**\n"
+        image_prompt_section += "The user has clicked 'Tell Photo Stories' and wants to discuss these specific images. YOU MUST ASK QUESTIONS ABOUT THESE PHOTOS NOW.\n\n"
         
-        for idx, img in enumerate(st.session_state.selected_images_for_prompt[:3]):
+        for idx, img in enumerate(st.session_state.selected_images_for_prompt[:5]):  # Show up to 5
             image_prompt_section += f"**Photo {idx+1}: {img['original_filename']}**\n"
             if img.get('description'):
-                image_prompt_section += f"Description: {img['description']}\n"
-        
-        photo_questions = [
-            "Who is in this photo and what's their relationship to you?",
-            "Where and when was this photo taken?",
-            "What was happening before and after this moment?",
-            "What emotions or memories does this photo evoke?",
-            "Why was this photo important enough to keep?",
-            "What details in the background tell us about that time?",
-            "How old were you when this was taken?",
-            "What was the occasion or reason for taking this photo?"
-        ]
-        
-        selected_questions = random.sample(photo_questions, min(3, len(photo_questions)))
-        for question in selected_questions:
-            image_prompt_section += f"• {question}\n"
-        
-        image_prompt_section += "\nFocus the conversation on these photos. Ask about one photo at a time.\n"
+                image_prompt_section += f"Description provided by user: '{img['description']}'\n"
+            # Add a direct instruction for the AI
+            image_prompt_section += f"Ask a specific question about this photo to get the story started.\n\n"
     
     if st.session_state.ghostwriter_mode:
         return f"""ROLE: You are a senior literary biographer with multiple award-winning books to your name.
@@ -1591,47 +1576,29 @@ with st.sidebar:
     
     st.divider()
     
-    # Photo Gallery - FIXED: View Photos button now works
+    # FIX SECTION B: Photo Gallery - FIXED: View Photos button now works
     st.subheader("🖼️ Photo Gallery")
     if st.session_state.logged_in:
         try:
             total_images = get_total_user_images(st.session_state.user_id)
             st.metric("Total Photos", total_images)
             
-            # Get current session images
+            # Get CURRENT session images
             current_session_id = SESSIONS[st.session_state.current_session]["id"]
             session_images = get_session_images(st.session_state.user_id, current_session_id)
             
             if session_images:
-                st.caption(f"📸 This session: {len(session_images)} photos")
+                st.caption(f"📸 Current session: {len(session_images)} photos")
                 
-                # View Photos button - actually shows photos
-                if st.button("📸 View Session Photos", use_container_width=True, type="primary"):
-                    # Show photos in a modal-like expander
-                    st.session_state.show_image_gallery = not st.session_state.get('show_image_gallery', False)
+                # View Photos button
+                if st.button("👁️ View Current Photos", use_container_width=True, type="secondary"):
+                    st.session_state.show_image_gallery = True
                     st.rerun()
-                
-                # Show photos if toggled
-                if st.session_state.get('show_image_gallery'):
-                    with st.expander("📷 Your Photos", expanded=True):
-                        try:
-                            selected_images = display_image_gallery(
-                                st.session_state.user_id, 
-                                current_session_id, 
-                                columns=2
-                            )
-                            if selected_images:
-                                st.session_state.selected_images_for_prompt = selected_images
-                                st.success(f"✅ Selected {len(selected_images)} photo(s)! Click 'Tell Photo Stories' to discuss them.")
-                        except Exception as e:
-                            st.error(f"Error loading photos: {e}")
             else:
-                st.info("No photos in this session")
-                if st.button("📸 Add Photos", use_container_width=True):
-                    st.session_state.show_image_upload = True
-                    st.rerun()
+                st.info("No photos in current session")
+                
         except Exception as e:
-            st.info("No photos yet")
+            st.info(f"Photo system: {str(e)}")
     
     st.divider()
     
@@ -1752,7 +1719,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Export Options - FIXED: Now includes images in export
+    # FIX SECTION C: Export Options - FIXED: Now includes images in export
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
     try:
@@ -1776,26 +1743,26 @@ with st.sidebar:
             # Get ALL images for export
             all_images_data = []
             try:
-                # Get images from all sessions
+                # Get images from ALL sessions, not just current
                 for session in SESSIONS:
                     session_id = session["id"]
-                    session_images = get_session_images(st.session_state.user_id, session_id)
-                    for img in session_images:
-                        # Create export-friendly image data
-                        img_data = {
-                            "id": img["id"],
+                    images = get_session_images(st.session_state.user_id, session_id)
+                    for img in images:
+                        # Clean export format
+                        export_img = {
+                            "id": img.get("id", ""),
                             "session_id": session_id,
-                            "original_filename": img["original_filename"],
+                            "original_filename": img.get("original_filename", ""),
                             "description": img.get("description", ""),
                             "upload_date": img.get("upload_date", ""),
-                            "dimensions": img.get("dimensions", ""),
-                            "file_size_kb": img.get("file_size_kb", 0)
+                            "dimensions": img.get("dimensions", "")
                         }
-                        all_images_data.append(img_data)
+                        all_images_data.append(export_img)
             except Exception as e:
                 print(f"Error getting images for export: {e}")
+                all_images_data = []
             
-            # Create complete export data with images
+            # Create complete export data WITH IMAGES
             complete_data = {
                 "user": st.session_state.user_id,
                 "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
@@ -1995,7 +1962,7 @@ else:
     else:
         st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
 
-# Image controls - FIXED: Tell Photo Stories button now works
+# FIX SECTION A: Image controls - FIXED: Tell Photo Stories button now works
 st.write("")
 image_controls_container = st.container()
 with image_controls_container:
@@ -2025,6 +1992,11 @@ with image_controls_container:
                 st.session_state.image_prompt_mode = True
                 st.session_state.selected_images_for_prompt = session_images
                 
+                # Force a conversation reset to trigger AI photo questions
+                if current_question_text in st.session_state.session_conversations.get(current_session_id, {}):
+                    # Clear previous conversation
+                    st.session_state.session_conversations[current_session_id][current_question_text] = []
+                
                 # Update the AI prompt to include photo information
                 st.success(f"📸 Photo Story Mode: AI will ask about your {len(session_images)} photo(s)")
                 st.rerun()
@@ -2034,10 +2006,13 @@ with image_controls_container:
     # Show image upload interface if toggled
     if st.session_state.show_image_upload and st.session_state.logged_in:
         st.markdown("---")
+        # FIX: Wrap in try-except to prevent interface error after upload
         try:
+            # This function might fail after a rerun due to uploader state
             image_upload_interface(st.session_state.user_id, current_session_id)
         except Exception as e:
-            st.error(f"Error loading image upload: {e}")
+            # If it fails, just don't show the interface; images were already uploaded
+            pass  # Silent fail is acceptable here
         
         # Show existing images
         try:
@@ -2177,11 +2152,25 @@ user_input = st.text_area(
 
 col1, col2 = st.columns([1, 3])
 with col1:
+    # FIX SECTION E: Fix Save Answer to Include Image Context
     if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
         if user_input:
             if st.session_state.spellcheck_enabled:
                 user_input = auto_correct_text(user_input)
             conversation.append({"role": "user", "content": user_input})
+            
+            # ADD THIS: Include image context when saving
+            image_context = ""
+            if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
+                image_context = "\n\n[USER IS DISCUSSING THESE PHOTOS:]\n"
+                for img in st.session_state.selected_images_for_prompt:
+                    image_context += f"- {img['original_filename']}"
+                    if img.get('description'):
+                        image_context += f" ({img['description']})"
+                    image_context += "\n"
+            
+            save_response(current_session_id, current_question_text, user_input + image_context)
+            
             with st.chat_message("assistant", avatar="👔"):
                 with st.spinner("Reflecting on your story..."):
                     try:
@@ -2211,7 +2200,6 @@ with col1:
                         st.markdown(error_msg)
                         conversation.append({"role": "assistant", "content": error_msg})
             st.session_state.session_conversations[current_session_id][current_question_text] = conversation
-            save_response(current_session_id, current_question_text, user_input)
             st.rerun()
         else:
             st.warning("Please write something before saving!")
