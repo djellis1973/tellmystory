@@ -34,7 +34,8 @@ try:
         display_image_gallery,
         get_images_for_prompt,
         get_total_user_images,
-        image_upload_interface
+        image_upload_interface,
+        get_image_data_url  # <-- Added this import
     )
 except ImportError as e:
     st.error(f"Error importing modules: {e}")
@@ -1955,51 +1956,61 @@ else:
     else:
         st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
 
-# CRITICAL SECTION 1: Image Upload Section - SIMPLIFIED (No AI Photo Stories)
-st.write("")
-image_controls_container = st.container()
-with image_controls_container:
-    # Just the Add Photos button - NO AI STORIES
-    button_text = "📷 Add Photos" if not st.session_state.show_image_upload else "📷 Hide Photos"
-    if st.button(button_text, key="toggle_image_upload", use_container_width=True):
-        st.session_state.show_image_upload = not st.session_state.show_image_upload
-        st.rerun()
+# ============================================================================
+# PHOTO + STORY UPLOAD SECTION - REPLACED SECTION
+# ============================================================================
+st.markdown("---")
+
+# Check if user wants to add photos
+col1, col2 = st.columns([1, 3])
+with col1:
+    add_photos = st.button("📷 Add Photo + Story", key="add_photo_story", use_container_width=True, type="secondary")
     
-    # Show image upload interface if toggled
-    if st.session_state.show_image_upload and st.session_state.logged_in:
-        st.markdown("---")
-        # This function now handles ONE image at a time with description
-        try:
-            image_upload_interface(st.session_state.user_id, current_session_id)
-        except Exception as e:
-            pass  # Silent fail is acceptable here
-        
-        # Show existing images gallery
-        try:
-            session_images = get_session_images(st.session_state.user_id, current_session_id)
-            if session_images:
-                st.subheader("📸 Your Photos for This Session")
-                selected_images = display_image_gallery(
-                    st.session_state.user_id, 
-                    current_session_id, 
-                    columns=2
-                )
-        except Exception as e:
-            st.info("No photos uploaded for this session yet.")
+if add_photos or st.session_state.get('show_image_upload', False):
+    st.session_state.show_image_upload = True
+    
+    st.markdown("### 📤 Add Photo + Story to This Session")
+    st.write("Upload a photo and write the story about it. This will be saved to your current session.")
+    
+    # Use the fixed image upload interface
+    try:
+        image_upload_interface(st.session_state.user_id, current_session_id)
+    except Exception as e:
+        st.error("Could not load image upload. Please try again.")
     
     st.markdown("---")
-    
-    # Historical context message
-    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
-        try:
-            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
-            events = get_events_for_birth_year(birth_year)
-            if events and st.session_state.ghostwriter_mode:
-                uk_count = len([e for e in events if e.get('region') == 'UK'])
-                global_count = len(events) - uk_count
-                st.info(f"📜 **Historical Context Enabled:** Your responses will be enriched with {len(events)} historical events ({uk_count} UK, {global_count} global) from your lifetime.")
-        except:
-            pass
+
+# Show existing photos in this session
+try:
+    session_images = get_session_images(st.session_state.user_id, current_session_id)
+    if session_images:
+        st.markdown(f"### 📸 Photos in This Session ({len(session_images)})")
+        
+        # Show a few photos
+        cols = st.columns(min(3, len(session_images)))
+        for idx, img in enumerate(session_images[:3]):
+            with cols[idx % 3]:
+                if os.path.exists(img["paths"]["thumbnail"]):
+                    data_url = get_image_data_url(img["paths"]["thumbnail"])
+                    if data_url:
+                        st.markdown(
+                            f'<div style="text-align: center;">'
+                            f'<img src="{data_url}" style="max-width: 100%; max-height: 150px; border-radius:8px;">'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+                st.caption(f"📁 {img['original_filename'][:20]}...")
+                if img.get('story'):
+                    st.caption(f"📝 {img['story'][:50]}...")
+        
+        if len(session_images) > 3:
+            st.caption(f"... and {len(session_images) - 3} more photos")
+            
+except Exception as e:
+    # No photos or error
+    pass
+
+st.markdown("---")
 
 # Conversation area
 if current_session_id not in st.session_state.session_conversations:
