@@ -2322,16 +2322,11 @@ if current_user and current_user != "" and export_data:
     # Count total stories (matching original app logic)
     total_stories = sum(len(session['questions']) for session in export_data.values())
     
-    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP WITH IMAGES
+    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP
     json_data = json.dumps({
         "user": current_user,
-        "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
         "stories": export_data,
-        "export_date": datetime.now().isoformat(),
-        "summary": {
-            "total_stories": total_stories,
-            "total_sessions": len(export_data)
-        }
+        "export_date": datetime.now().isoformat()
     }, indent=2)
     
     # Encode the data for URL
