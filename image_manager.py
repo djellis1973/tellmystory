@@ -1,5 +1,5 @@
 """
-Image Manager Module - FIXED VERSION
+Image Manager Module - COMPLETE WORKING VERSION
 Upload photos with stories
 """
 
@@ -160,6 +160,43 @@ def save_uploaded_image(uploaded_file, user_id, session_id, story_text=""):
     except Exception as e:
         return {"success": False, "error": f"Error: {str(e)}"}
 
+def delete_image(user_id, session_id, image_id):
+    """Delete an image and its metadata"""
+    try:
+        metadata_file = f"user_images/{user_id}/image_metadata.json"
+        
+        if os.path.exists(metadata_file):
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+            
+            session_key = str(session_id)
+            if session_key in metadata:
+                # Find and remove image
+                for i, img in enumerate(metadata[session_key]):
+                    if img["id"] == image_id:
+                        # Delete image files
+                        if os.path.exists(img["paths"]["original"]):
+                            os.remove(img["paths"]["original"])
+                        if os.path.exists(img["paths"]["thumbnail"]):
+                            os.remove(img["paths"]["thumbnail"])
+                        
+                        # Remove from metadata
+                        metadata[session_key].pop(i)
+                        
+                        # If session has no more images, remove session entry
+                        if not metadata[session_key]:
+                            del metadata[session_key]
+                        
+                        # Save updated metadata
+                        with open(metadata_file, 'w') as f:
+                            json.dump(metadata, f, indent=2)
+                        
+                        return {"success": True, "message": "Image deleted successfully"}
+        
+        return {"success": False, "error": "Image not found"}
+    except Exception as e:
+        return {"success": False, "error": f"Error deleting image: {str(e)}"}
+
 def get_image_data_url(image_path):
     """Convert image to data URL for HTML display"""
     try:
@@ -208,8 +245,12 @@ def display_image_gallery(user_id, session_id, columns=3):
             
             # Delete button
             if st.button("🗑️ Delete", key=f"delete_{session_id}_{img_info['id']}", use_container_width=True):
-                # We'll handle this separately
-                st.warning("Delete function to be implemented")
+                result = delete_image(user_id, session_id, img_info["id"])
+                if result["success"]:
+                    st.success(result["message"])
+                    st.rerun()
+                else:
+                    st.error(result["error"])
             
             st.divider()
     
@@ -252,6 +293,23 @@ def image_upload_interface(user_id, session_id):
         with col2:
             if st.button("🔄 Cancel", key=f"cancel_{session_id}", use_container_width=True):
                 st.rerun()
+
+def get_images_for_prompt(user_id, session_id):
+    """Get images formatted for AI prompt"""
+    images = get_session_images(user_id, session_id)
+    
+    if not images:
+        return ""
+    
+    prompt_text = "\n\n📸 **USER HAS PHOTOS IN THIS SESSION:**\n"
+    
+    for img in images:
+        prompt_text += f"- {img['original_filename']}"
+        if img.get('story'):
+            prompt_text += f" - {img['story'][:100]}"
+        prompt_text += "\n"
+    
+    return prompt_text
 
 def get_images_for_session(user_id, session_id):
     """Get images + stories for a session"""
