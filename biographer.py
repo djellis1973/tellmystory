@@ -724,11 +724,20 @@ Consider how these historical moments might have shaped their experiences and pe
         except:
             pass
     
-    # FIX SECTION D: Photo Story Mode section - FIXED TO BE MORE ACTIVE
+    # Photo Story Mode section - FORCE AI TO ASK
     image_prompt_section = ""
     if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
-        image_prompt_section = "\n\n🎯 **USER HAS INITIATED PHOTO STORY MODE:**\n"
-        image_prompt_section += "The user has clicked 'Tell Photo Stories' and wants to discuss these specific images. YOU MUST ASK QUESTIONS ABOUT THESE PHOTOS NOW.\n\n"
+        image_prompt_section = "\n\n🎯 **USER CLICKED 'TELL PHOTO STORIES':**\n"
+        image_prompt_section += "THE USER WANTS TO TALK ABOUT THEIR PHOTOS. YOU MUST ASK ABOUT THEM NOW.\n\n"
+        
+        image_prompt_section += "**USER'S PHOTOS TO DISCUSS:**\n"
+        for idx, img in enumerate(st.session_state.selected_images_for_prompt[:3]):
+            image_prompt_section += f"- {img['original_filename']}"
+            if img.get('description'):
+                image_prompt_section += f" ({img['description']})"
+            image_prompt_section += "\n"
+        
+        image_prompt_section += "\n**START YOUR RESPONSE WITH:** 'I see you have photos! Tell me about [FIRST PHOTO NAME].'\n"
         
         for idx, img in enumerate(st.session_state.selected_images_for_prompt[:5]):  # Show up to 5
             image_prompt_section += f"**Photo {idx+1}: {img['original_filename']}**\n"
