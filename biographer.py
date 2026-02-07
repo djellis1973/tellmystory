@@ -1773,6 +1773,15 @@ with st.sidebar:
                 st.session_state.confirming_clear = "all"
                 st.rerun()
 
+    # ============================================================================
+    # DEBUG SECTION - Add this at the VERY END of the sidebar
+    # ============================================================================
+    st.sidebar.markdown("---")
+    
+    if st.sidebar.button("🛠️ Debug Image System", key="debug_images"):
+        debug_image_system()
+        st.rerun()
+
 # ── Main Content Area ─────────────────────────────────────────────────────────
 # Check if we have a valid current session
 if st.session_state.current_session >= len(SESSIONS):
