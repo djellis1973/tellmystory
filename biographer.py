@@ -384,7 +384,7 @@ def logout_user():
         'show_vignette_manager', 'custom_topic_input', 'show_custom_topic_modal',
         'show_topic_browser', 'show_session_manager', 'show_session_creator',
         'editing_custom_session', 'show_vignette_detail', 'selected_vignette_id',
-        'editing_vignette_id', 'selected_vignette_for_session'
+        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery'
     ]
     for key in keys:
         st.session_state.pop(key, None)
@@ -522,24 +522,31 @@ Consider how these historical moments might have shaped their experiences and pe
     
     image_prompt_section = ""
     if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
-        image_prompt_section = "\n\n📸 **PHOTO STORY MODE:**\n"
-        image_prompt_section += "The user has selected specific photos to write about. "
-        image_prompt_section += "Ask questions about these specific photos:\n\n"
+        image_prompt_section = "\n\n🎯 **PHOTO STORY MODE ACTIVATED:**\n"
+        image_prompt_section += f"The user wants to discuss {len(st.session_state.selected_images_for_prompt)} specific photo(s).\n"
+        image_prompt_section += "Ask detailed questions about each photo:\n\n"
+        
         for idx, img in enumerate(st.session_state.selected_images_for_prompt[:3]):
             image_prompt_section += f"**Photo {idx+1}: {img['original_filename']}**\n"
             if img.get('description'):
                 image_prompt_section += f"Description: {img['description']}\n"
-        photo_prompts = [
-            "Who is in this photo?",
-            "Where and when was this taken?",
-            "What was happening just before/after this moment?",
-            "What emotions does this photo bring up?",
-            "Why was this photo taken/saved?"
+        
+        photo_questions = [
+            "Who is in this photo and what's their relationship to you?",
+            "Where and when was this photo taken?",
+            "What was happening before and after this moment?",
+            "What emotions or memories does this photo evoke?",
+            "Why was this photo important enough to keep?",
+            "What details in the background tell us about that time?",
+            "How old were you when this was taken?",
+            "What was the occasion or reason for taking this photo?"
         ]
-        selected_prompts = random.sample(photo_prompts, min(3, len(photo_prompts)))
-        for prompt in selected_prompts:
-            image_prompt_section += f"• {prompt}\n"
-        image_prompt_section += "\n"
+        
+        selected_questions = random.sample(photo_questions, min(3, len(photo_questions)))
+        for question in selected_questions:
+            image_prompt_section += f"• {question}\n"
+        
+        image_prompt_section += "\nFocus the conversation on these photos. Ask about one photo at a time.\n"
     
     if st.session_state.ghostwriter_mode:
         return f"""ROLE: You are a senior literary biographer with multiple award-winning books to your name.
@@ -552,12 +559,13 @@ YOUR APPROACH:
 3. Connect personal stories to historical context when relevant
 4. Find the story that needs to be told
 5. When photos are mentioned, ask SPECIFIC questions about them
-PHOTO QUESTIONS TO ASK:
-• "Who are the people in this photo?"
-• "What was happening that day?"
-• "Where was this taken and why were you there?"
-• "What do you remember feeling when this was taken?"
+
+PHOTO-FOCUSED QUESTIONS:
+• "Looking at this photo, what sounds/smells/feelings do you remember?"
+• "Who took this photo and why?"
 • "What happened right after this photo was taken?"
+• "How does this photo connect to your broader life story?"
+
 Tone: Literary but not pretentious. Serious but not solemn.
 IMPORTANT: When photos are mentioned, ask specific, detailed questions about them."""
     else:
@@ -565,15 +573,17 @@ IMPORTANT: When photos are mentioned, ask specific, detailed questions about the
 CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
 CURRENT TOPIC: "{current_question}"
 {historical_context}{image_context}{image_prompt_section}
-Please:
-1. Listen actively
-2. Acknowledge warmly
-3. Ask ONE natural follow-up question that connects to historical context or photos
-4. When photos are mentioned, ask about the people, place, and emotions
-PHOTO QUESTIONS:
+
+PHOTO-FOCUSED APPROACH:
+1. When photos are mentioned, ask about the people, place, time, and emotions
+2. Connect photos to the broader life story
+3. Ask for specific sensory details
+
+Example photo questions:
 • "Tell me about the people in this photo"
 • "What's the story behind this moment?"
 • "How do you feel when you look at this photo?"
+
 Tone: Kind, curious, professional"""
 
 # ── Core Functions ────────────────────────────────────────────────────────────
@@ -1010,7 +1020,8 @@ default_state = {
     "selected_vignette_id": None,
     "editing_vignette_id": None,
     "selected_vignette_for_session": None,
-    "published_vignette": None,  # Added for vignette publish handling
+    "published_vignette": None,
+    "show_image_gallery": False,
 }
 
 for key, value in default_state.items():
@@ -1376,19 +1387,46 @@ with st.sidebar:
     
     st.divider()
     
-    # Photo Gallery - UPDATED
+    # Photo Gallery - FIXED: View Photos button now works
     st.subheader("🖼️ Photo Gallery")
     if st.session_state.logged_in:
         try:
             total_images = get_total_user_images(st.session_state.user_id)
             st.metric("Total Photos", total_images)
-            if total_images > 0:
-                if st.button("📸 View Photos", use_container_width=True):
+            
+            # Get current session images
+            current_session_id = SESSIONS[st.session_state.current_session]["id"]
+            session_images = get_session_images(st.session_state.user_id, current_session_id)
+            
+            if session_images:
+                st.caption(f"📸 This session: {len(session_images)} photos")
+                
+                # View Photos button - actually shows photos
+                if st.button("📸 View Session Photos", use_container_width=True, type="primary"):
+                    # Show photos in a modal-like expander
+                    st.session_state.show_image_gallery = not st.session_state.get('show_image_gallery', False)
+                    st.rerun()
+                
+                # Show photos if toggled
+                if st.session_state.get('show_image_gallery'):
+                    with st.expander("📷 Your Photos", expanded=True):
+                        try:
+                            selected_images = display_image_gallery(
+                                st.session_state.user_id, 
+                                current_session_id, 
+                                columns=2
+                            )
+                            if selected_images:
+                                st.session_state.selected_images_for_prompt = selected_images
+                                st.success(f"✅ Selected {len(selected_images)} photo(s)! Click 'Tell Photo Stories' to discuss them.")
+                        except Exception as e:
+                            st.error(f"Error loading photos: {e}")
+            else:
+                st.info("No photos in this session")
+                if st.button("📸 Add Photos", use_container_width=True):
                     st.session_state.show_image_upload = True
                     st.rerun()
-            else:
-                st.info("No photos yet")
-        except:
+        except Exception as e:
             st.info("No photos yet")
     
     st.divider()
@@ -1510,7 +1548,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Export Options - UPDATED
+    # Export Options - FIXED: Now includes images in export
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
     try:
@@ -1531,17 +1569,48 @@ with st.sidebar:
                 }
         
         if export_data:
+            # Get ALL images for export
+            all_images_data = []
+            try:
+                # Get images from all sessions
+                for session in SESSIONS:
+                    session_id = session["id"]
+                    session_images = get_session_images(st.session_state.user_id, session_id)
+                    for img in session_images:
+                        # Create export-friendly image data
+                        img_data = {
+                            "id": img["id"],
+                            "session_id": session_id,
+                            "original_filename": img["original_filename"],
+                            "description": img.get("description", ""),
+                            "upload_date": img.get("upload_date", ""),
+                            "dimensions": img.get("dimensions", ""),
+                            "file_size_kb": img.get("file_size_kb", 0)
+                        }
+                        all_images_data.append(img_data)
+            except Exception as e:
+                print(f"Error getting images for export: {e}")
+            
+            # Create complete export data with images
             complete_data = {
                 "user": st.session_state.user_id,
+                "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
                 "stories": export_data,
+                "images": all_images_data,  # Include all image metadata
                 "export_date": datetime.now().isoformat(),
                 "summary": {
-                    "total_stories": sum(len(session['questions']) for session in export_data.values())
+                    "total_stories": sum(len(session['questions']) for session in export_data.values()),
+                    "total_images": len(all_images_data),
+                    "total_sessions": len(export_data)
                 }
             }
+            
             json_data = json.dumps(complete_data, indent=2)
             encoded_data = base64.b64encode(json_data.encode()).decode()
-            publisher_url = f"https://tellmystory-jlav4zxitziswt6zwbxdzt.streamlit.app/?data={encoded_data}"
+            
+            # USE THE ORIGINAL URL FROM YOUR WORKING APP
+            publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
+            publisher_url = f"{publisher_base_url}?data={encoded_data}"
             
             col1, col2 = st.columns(2)
             with col1:
@@ -1713,19 +1782,23 @@ else:
     else:
         st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
 
-# Image controls
+# Image controls - FIXED: Tell Photo Stories button now works
 st.write("")
 image_controls_container = st.container()
 with image_controls_container:
     has_images = False
+    session_images = []
+    
     if st.session_state.logged_in:
         try:
             session_images = get_session_images(st.session_state.user_id, current_session_id)
             has_images = len(session_images) > 0
-        except:
+        except Exception as e:
+            print(f"Error getting session images: {e}")
             has_images = False
     
     img_col1, img_col2 = st.columns(2)
+    
     with img_col1:
         button_text = "📷 Add Photos" if not st.session_state.show_image_upload else "📷 Hide Photos"
         if st.button(button_text, key="toggle_image_upload", use_container_width=True):
@@ -1735,24 +1808,37 @@ with image_controls_container:
     with img_col2:
         if has_images:
             if st.button("✨ Tell Photo Stories", key="photo_stories_btn", use_container_width=True, type="primary"):
+                # Enable photo story mode
                 st.session_state.image_prompt_mode = True
+                st.session_state.selected_images_for_prompt = session_images
+                
+                # Update the AI prompt to include photo information
+                st.success(f"📸 Photo Story Mode: AI will ask about your {len(session_images)} photo(s)")
                 st.rerun()
         else:
             st.button("✨ Tell Photo Stories", key="disabled_photo_stories", use_container_width=True, disabled=True)
     
+    # Show image upload interface if toggled
     if st.session_state.show_image_upload and st.session_state.logged_in:
         st.markdown("---")
         try:
             image_upload_interface(st.session_state.user_id, current_session_id)
-        except:
-            st.warning("Image upload interface not available")
+        except Exception as e:
+            st.error(f"Error loading image upload: {e}")
         
+        # Show existing images
         try:
-            selected_images = display_image_gallery(st.session_state.user_id, current_session_id, columns=2)
-            if selected_images:
-                st.session_state.selected_images_for_prompt = selected_images
-                st.success(f"✅ Selected {len(selected_images)} photo(s)! Click 'Tell Photo Stories' to write about them.")
-        except:
+            if has_images:
+                st.subheader("📸 Your Photos for This Session")
+                selected_images = display_image_gallery(
+                    st.session_state.user_id, 
+                    current_session_id, 
+                    columns=2
+                )
+                if selected_images:
+                    st.session_state.selected_images_for_prompt = selected_images
+                    st.success(f"✅ Selected {len(selected_images)} photo(s) for storytelling!")
+        except Exception as e:
             st.info("No photos uploaded for this session yet.")
     
     st.markdown("---")
@@ -2035,11 +2121,16 @@ if current_user and current_user != "" and export_data:
     # Count total stories (matching original app logic)
     total_stories = sum(len(session['questions']) for session in export_data.values())
     
-    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP
+    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP WITH IMAGES
     json_data = json.dumps({
         "user": current_user,
+        "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
         "stories": export_data,
-        "export_date": datetime.now().isoformat()
+        "export_date": datetime.now().isoformat(),
+        "summary": {
+            "total_stories": total_stories,
+            "total_sessions": len(export_data)
+        }
     }, indent=2)
     
     # Encode the data for URL
