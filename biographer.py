@@ -2429,61 +2429,6 @@ elif current_user and current_user != "":
     st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
 else:
     st.info("👤 **Please log in to format your biography**")
-    
-    # Encode the data for URL
-    encoded_data = base64.b64encode(json_data.encode()).decode()
-    
-    # USE THE ORIGINAL URL FROM YOUR WORKING APP
-    publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
-    publisher_url = f"{publisher_base_url}?data={encoded_data}"
-    
-    st.success(f"✅ **{total_stories} stories ready for formatting!**")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### 🖨️ Format Biography")
-        st.markdown(f"""
-        Generate a professionally formatted biography from your stories.
-        
-        **[📘 Click to Format Biography]({publisher_url})**
-        
-        Your formatted biography will include:
-        • Professional formatting
-        • Table of contents
-        • All your stories organized
-        • Ready to print or share
-        """)
-    
-    with col2:
-        st.markdown("#### 🔐 Save to Your Vault")
-        st.markdown("""
-        **After formatting your biography:**
-        
-        1. Generate your biography (link on left)
-        2. Download the formatted PDF
-        3. Save it to your secure vault
-        
-        **[💾 Go to Secure Vault](https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/)**
-        
-        Your vault preserves important documents forever.
-        """)
-    
-    # Backup download (exactly like original app)
-    with st.expander("📥 Download Raw Data (Backup)"):
-        st.download_button(
-            label="Download Stories as JSON",
-            data=json_data,
-            file_name=f"{current_user}_stories.json",
-            mime="application/json",
-            use_container_width=True
-        )
-        st.caption("Use this if the formatter link doesn't work")
-        
-elif current_user and current_user != "":
-    st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
-else:
-    st.info("👤 **Please log in to format your biography**")
 
 # ============================================================================
 # FOOTER
