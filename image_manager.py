@@ -63,21 +63,41 @@ def save_image_metadata(user_id, session_id, image_info):
         return False
 
 def get_session_images(user_id, session_id):
-    """Get all images for a specific session"""
+    """Get all images for a specific session - FIXED FOR CORRUPTED FILE"""
     metadata_file = f"user_images/{user_id}/image_metadata.json"
     
-    if os.path.exists(metadata_file):
-        try:
-            with open(metadata_file, 'r') as f:
-                metadata = json.load(f)
-            
-            session_key = str(session_id)
-            if session_key in metadata:
-                return metadata[session_key]
-        except:
-            pass
+    # FIX: Ensure the directory and file exist
+    os.makedirs(os.path.dirname(metadata_file), exist_ok=True)
     
-    return []
+    if not os.path.exists(metadata_file):
+        # Create a valid empty JSON file
+        with open(metadata_file, 'w') as f:
+            json.dump({}, f)
+        return []
+    
+    try:
+        with open(metadata_file, 'r') as f:
+            metadata = json.load(f)
+        
+        session_key = str(session_id)
+        if session_key in metadata:
+            # FIX: Ensure we return a list even if data is malformed
+            session_images = metadata[session_key]
+            if isinstance(session_images, list):
+                return session_images
+            else:
+                # If data is not a list, reset it for this session
+                metadata[session_key] = []
+                with open(metadata_file, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+                return []
+        return []
+    except (json.JSONDecodeError, IOError):
+        # FIX: If file is corrupted, reset it
+        print(f"Error loading metadata from {metadata_file}. Resetting file.")
+        with open(metadata_file, 'w') as f:
+            json.dump({}, f)
+        return []
 
 def resize_image_if_needed(image, max_width=1920, max_height=1080):
     """Resize image if it's too large"""
@@ -212,7 +232,7 @@ def get_image_data_url(image_path):
         return None
 
 def display_image_gallery(user_id, session_id, columns=3):
-    """Display images in a gallery layout"""
+    """Display images in a gallery layout - FIXED SIZE AND ERRORS"""
     images = get_session_images(user_id, session_id)
     
     if not images:
@@ -230,24 +250,30 @@ def display_image_gallery(user_id, session_id, columns=3):
         col_idx = idx % columns
         
         with cols[col_idx]:
-            # Display thumbnail
+            # Display thumbnail with FIXED MAXIMUM SIZE
             if os.path.exists(img_info["paths"]["thumbnail"]):
                 data_url = get_image_data_url(img_info["paths"]["thumbnail"])
                 if data_url:
-                    st.markdown(f'<img src="{data_url}" style="width:100%; border-radius:8px; margin-bottom:5px;">', unsafe_allow_html=True)
+                    # FIX: Properly sized images with centered alignment
+                    st.markdown(
+                        f'<div style="text-align: center;">'
+                        f'<img src="{data_url}" style="max-width: 100%; max-height: 200px; width: auto; height: auto; border-radius:8px; margin: 0 auto;">'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
             
             # Image info
             st.caption(f"📁 {img_info['original_filename']}")
             if img_info.get('description'):
-                st.caption(f"💬 {img_info['description'][:30]}...")
+                st.caption(f"💬 {img_info['description'][:50]}")
             
             # Select checkbox
-            selected = st.checkbox(f"Select", key=f"select_img_{img_info['id']}")
+            selected = st.checkbox(f"Select", key=f"select_img_{session_id}_{img_info['id']}")
             if selected:
                 selected_images.append(img_info)
             
             # Delete button
-            if st.button("🗑️", key=f"delete_{img_info['id']}", help="Delete this image"):
+            if st.button("🗑️", key=f"delete_{session_id}_{img_info['id']}", help="Delete this image"):
                 result = delete_image(user_id, session_id, img_info["id"])
                 if result["success"]:
                     st.success(result["message"])
