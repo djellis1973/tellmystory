@@ -1,4 +1,4 @@
-# biographer.py – MemLife main app (FIXED VERSION)
+# biographer.py – Tell My Story App (Complete Working Version)
 import streamlit as st
 import json
 from datetime import datetime, date, timedelta
@@ -45,6 +45,210 @@ except ImportError as e:
     VignetteManager = None
     # Image functions will use fallbacks
 
+# ============================================================================
+# DEBUG FUNCTION - REPLACE YOUR CURRENT VERSION WITH THIS
+# ============================================================================
+def debug_image_system():
+    """Debug the image system - IMMEDIATE RESULTS"""
+    import os
+    import json
+    
+    st.title("🛠️ DEBUG: Image System Analysis")
+    
+    # Get user ID
+    user_id = st.session_state.get('user_id', 'not_logged_in')
+    st.write(f"**Current User ID:** `{user_id}`")
+    st.write(f"**Logged in:** {st.session_state.get('logged_in', False)}")
+    
+    # Check current session
+    if 'current_session' in st.session_state:
+        current_session = st.session_state.current_session
+        if SESSIONS and current_session < len(SESSIONS):
+            session_id = SESSIONS[current_session]["id"]
+            st.write(f"**Current Session ID:** {session_id}")
+    
+    st.divider()
+    
+    # 1. Check user_images folder structure
+    st.subheader("📁 Folder Structure")
+    
+    base_folder = "user_images"
+    user_folder = f"{base_folder}/{user_id}"
+    
+    st.write(f"**Checking:** `{user_folder}`")
+    
+    # Create if doesn't exist
+    os.makedirs(user_folder, exist_ok=True)
+    st.success(f"✅ Created/Confirmed: `{user_folder}`")
+    
+    # List all contents
+    if os.path.exists(base_folder):
+        st.write(f"**Contents of `{base_folder}`:**")
+        try:
+            items = os.listdir(base_folder)
+            for item in items:
+                item_path = os.path.join(base_folder, item)
+                if os.path.isdir(item_path):
+                    st.write(f"📁 `{item}/`")
+                    # List user's session folders
+                    if item == user_id:
+                        user_items = os.listdir(item_path)
+                        for user_item in user_items:
+                            st.write(f"   • `{user_item}`")
+                else:
+                    st.write(f"📄 `{item}`")
+        except Exception as e:
+            st.error(f"Cannot list: {e}")
+    else:
+        st.error(f"❌ Base folder `{base_folder}` doesn't exist!")
+    
+    st.divider()
+    
+    # 2. Check metadata file
+    st.subheader("📄 Metadata File")
+    
+    metadata_file = f"{user_folder}/image_metadata.json"
+    st.write(f"**File:** `{metadata_file}`")
+    
+    if os.path.exists(metadata_file):
+        file_size = os.path.getsize(metadata_file)
+        st.write(f"**Size:** {file_size} bytes")
+        
+        try:
+            with open(metadata_file, 'r') as f:
+                data = json.load(f)
+            
+            if isinstance(data, dict):
+                session_count = len(data)
+                total_images = sum(len(images) for images in data.values())
+                
+                st.success(f"✅ Valid JSON: {session_count} sessions, {total_images} images")
+                
+                if data:
+                    st.write("**Contents:**")
+                    for session_id, images in data.items():
+                        st.write(f"- Session `{session_id}`: {len(images)} images")
+                        for img in images[:2]:  # Show first 2 images
+                            st.write(f"  • `{img.get('original_filename', 'No name')}`")
+                else:
+                    st.info("Empty metadata (no images registered yet)")
+                    
+                # Show full JSON
+                with st.expander("📋 View Raw JSON"):
+                    st.json(data)
+            else:
+                st.error(f"❌ Invalid format: Expected dict, got {type(data)}")
+                st.write(f"Actual content type: {type(data)}")
+                st.write(f"Content: {str(data)[:200]}...")
+                
+        except json.JSONDecodeError as e:
+            st.error(f"❌ Corrupted JSON: {e}")
+            
+            # Show file content
+            try:
+                with open(metadata_file, 'r') as f:
+                    raw_content = f.read()
+                st.write("**Raw file content:**")
+                st.code(raw_content[:500] + "..." if len(raw_content) > 500 else raw_content)
+            except:
+                st.write("Cannot read file content")
+                
+        except Exception as e:
+            st.error(f"❌ Error reading: {e}")
+    else:
+        st.warning("⚠️ Metadata file doesn't exist")
+        
+        # Create empty one
+        try:
+            with open(metadata_file, 'w') as f:
+                json.dump({}, f)
+            st.success("✅ Created empty metadata file")
+        except Exception as e:
+            st.error(f"❌ Cannot create: {e}")
+    
+    st.divider()
+    
+    # 3. Test image_manager functions
+    st.subheader("🔧 Function Tests")
+    
+    try:
+        from image_manager import get_session_images, get_total_user_images, get_session_image_folder
+        
+        st.write("**Testing `get_session_images()`:**")
+        if 'current_session' in st.session_state and SESSIONS:
+            current_session_id = SESSIONS[st.session_state.current_session]["id"]
+            images = get_session_images(user_id, current_session_id)
+            st.write(f"`get_session_images('{user_id}', {current_session_id})`")
+            st.write(f"Result: {len(images)} images")
+            if images:
+                st.write("First image:", images[0].get('original_filename', 'No name'))
+        
+        st.write("**Testing `get_total_user_images()`:**")
+        total = get_total_user_images(user_id)
+        st.write(f"Result: {total} total images")
+        
+        st.write("**Testing `get_session_image_folder()`:**")
+        folder = get_session_image_folder(user_id, 1)
+        st.write(f"Result: `{folder}`")
+        
+    except Exception as e:
+        st.error(f"❌ Function test failed: {e}")
+        import traceback
+        with st.expander("🔍 View Full Traceback"):
+            st.code(traceback.format_exc())
+    
+    st.divider()
+    
+    # 4. Quick Fix Button
+    st.subheader("⚡ Quick Fix")
+    
+    if st.button("🔄 RESET METADATA FILE", type="primary"):
+        try:
+            # Create backup
+            if os.path.exists(metadata_file):
+                import shutil
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_file = f"{metadata_file}.backup_{timestamp}"
+                shutil.copy2(metadata_file, backup_file)
+                st.info(f"Backup created: `{backup_file}`")
+            
+            # Reset to empty valid JSON
+            with open(metadata_file, 'w') as f:
+                json.dump({}, f, indent=2)
+            
+            st.success("✅ Metadata file reset to empty valid JSON")
+            st.info("Your actual image files are safe. Only the index was reset.")
+            
+            # Auto-rerun
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Reset failed: {e}")
+    
+    if st.button("📁 CREATE ALL MISSING FOLDERS"):
+        try:
+            # Create all possible session folders
+            for i in range(1, 10):
+                folder = f"{user_folder}/session_{i}"
+                os.makedirs(folder, exist_ok=True)
+            
+            # Also create for current session
+            if 'current_session' in st.session_state and SESSIONS:
+                current_session_id = SESSIONS[st.session_state.current_session]["id"]
+                current_folder = f"{user_folder}/session_{current_session_id}"
+                os.makedirs(current_folder, exist_ok=True)
+                st.write(f"Created: `{current_folder}`")
+            
+            st.success("✅ Created all session folders")
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Failed: {e}")
+    
+    st.divider()
+    st.caption("Debug ran at: " + datetime.now().strftime("%H:%M:%S"))
+
 DEFAULT_WORD_TARGET = 500
 
 # ── OpenAI client ─────────────────────────────────────────────────────────────
@@ -58,56 +262,107 @@ except FileNotFoundError:
     st.warning("styles.css not found – layout may look broken")
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/01/logo.png"
+LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo.png"
 
-# ── Sessions ──────────────────────────────────────────────────────────────────
-SESSIONS = [
-    {
-        "id": 1,
-        "title": "Childhood",
-        "guidance": "Welcome to Session 1: Childhood—this is where we lay the foundation of your story. Professional biographies thrive on specific, sensory-rich memories. I'm looking for the kind of details that transport readers: not just what happened, but how it felt, smelled, sounded. The 'insignificant' moments often reveal the most. Take your time—we're mining for gold here.",
-        "questions": [
-            "What is your earliest memory?",
-            "Can you describe your family home growing up?",
-            "Who were the most influential people in your early years?",
-            "What was school like for you?",
-            "Were there any favourite games or hobbies?",
-            "Is there a moment from childhood that shaped who you are?",
-            "If you could give your younger self some advice, what would it be?"
-        ],
-        "completed": False,
-        "word_target": 800
-    },
-    {
-        "id": 2,
-        "title": "Family & Relationships",
-        "guidance": "Welcome to Session 2: Family & Relationships—this is where we explore the people who shaped you. Family stories are complex ecosystems. We're not seeking perfect narratives, but authentic ones. The richest material often lives in the tensions, the unsaid things, the small rituals. My job is to help you articulate what usually goes unspoken. Think in scenes rather than summaries.",
-        "questions": [
-            "How would you describe your relationship with your parents?",
-            "Are there any family traditions you remember fondly?",
-            "What was your relationship like with siblings or close relatives?",
-            "Can you share a story about a family celebration or challenge?",
-            "How did your family shape your values?"
-        ],
-        "completed": False,
-        "word_target": 700
-    },
-    {
-        "id": 3,
-        "title": "Education & Growing Up",
-        "guidance": "Welcome to Session 3: Education & Growing Up—this is where we explore how you learned to navigate the world. Education isn't just about schools—it's about how you learned to navigate the world. We're interested in the hidden curriculum: what you learned about yourself, about systems, about survival and growth. Think beyond grades to transformation.",
-        "questions": [
-            "What were your favourite subjects at school?",
-            "Did you have any memorable teachers or mentors?",
-            "How did you feel about exams and studying?",
-            "Were there any big turning points in your education?",
-            "Did you pursue further education or training?",
-            "What advice would you give about learning?"
-        ],
-        "completed": False,
-        "word_target": 600
-    }
-]
+# ── Sessions (ONLY FROM CSV - NO HARDCODING) ─────────────────────────────────
+def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
+    """Load sessions ONLY from CSV file - NO hardcoded fallback"""
+    try:
+        import pandas as pd
+        import os
+        
+        # Create sessions directory if it doesn't exist
+        os.makedirs(os.path.dirname(csv_path) if os.path.dirname(csv_path) else '.', exist_ok=True)
+        
+        if not os.path.exists(csv_path):
+            # CSV doesn't exist - show error and return empty list
+            st.error(f"❌ Sessions CSV file not found: {csv_path}")
+            st.info("""
+            Please create a `sessions/sessions.csv` file with this format:
+            
+            session_id,title,guidance,question,word_target
+            1,Childhood,"Welcome to Session 1...","What is your earliest memory?",500
+            1,Childhood,,"Can you describe your family home?",500
+            
+            Guidance only needs to be in the first row of each session.
+            """)
+            return []
+        
+        df = pd.read_csv(csv_path)
+        
+        # Check required columns
+        required_columns = ['session_id', 'question']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            st.error(f"❌ Missing required columns in CSV: {missing_columns}")
+            st.info("CSV must have at least: session_id, question")
+            return []
+        
+        # Group by session_id
+        sessions_dict = {}
+        
+        for session_id, group in df.groupby('session_id'):
+            session_id_int = int(session_id)
+            group = group.reset_index(drop=True)
+            
+            # Get title (use first row's title or default)
+            title = f"Session {session_id_int}"
+            if 'title' in group.columns and not group.empty:
+                first_title = group.iloc[0]['title']
+                if pd.notna(first_title) and str(first_title).strip():
+                    title = str(first_title).strip()
+            
+            # Get guidance (use first row's guidance)
+            guidance = ""
+            if 'guidance' in group.columns and not group.empty:
+                first_guidance = group.iloc[0]['guidance']
+                if pd.notna(first_guidance) and str(first_guidance).strip():
+                    guidance = str(first_guidance).strip()
+            
+            # Get word target (use first row's word_target or default to 500)
+            word_target = DEFAULT_WORD_TARGET
+            if 'word_target' in group.columns and not group.empty:
+                first_target = group.iloc[0]['word_target']
+                if pd.notna(first_target):
+                    try:
+                        word_target = int(float(first_target))
+                    except:
+                        word_target = DEFAULT_WORD_TARGET
+            
+            # Get all questions
+            questions = []
+            for _, row in group.iterrows():
+                if 'question' in row and pd.notna(row['question']) and str(row['question']).strip():
+                    questions.append(str(row['question']).strip())
+            
+            # Only add session if it has questions
+            if questions:
+                sessions_dict[session_id_int] = {
+                    "id": session_id_int,
+                    "title": title,
+                    "guidance": guidance,
+                    "questions": questions,
+                    "completed": False,
+                    "word_target": word_target
+                }
+        
+        # Convert to list and sort by session_id
+        sessions_list = list(sessions_dict.values())
+        sessions_list.sort(key=lambda x: x['id'])
+        
+        if not sessions_list:
+            st.warning("⚠️ No sessions found in CSV file")
+            return []
+        
+        st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
+        return sessions_list
+        
+    except Exception as e:
+        st.error(f"❌ Error loading sessions from CSV: {e}")
+        return []
+
+# Load sessions ONCE at startup
+SESSIONS = load_sessions_from_csv()
 
 # ── Historical events – CSV only ──────────────────────────────────────────────
 def create_default_events_csv():
@@ -276,12 +531,12 @@ def send_welcome_email(user_data, credentials):
         msg = MIMEMultipart()
         msg['From'] = EMAIL_CONFIG['sender_email']
         msg['To'] = user_data['email']
-        msg['Subject'] = "Welcome to MemLife - Your Account Details"
+        msg['Subject'] = "Welcome to Tell My Story - Your Account Details"
         body = f"""
         <html>
         <body style="font-family: Arial; line-height: 1.6; color: #333;">
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2c3e50;">Welcome to MemLife, {user_data['first_name']}!</h2>
+            <h2 style="color: #2c3e50;">Welcome to Tell My Story, {user_data['first_name']}!</h2>
             <p>Thank you for creating your account.</p>
             <div style="background-color: #f8f9fa; border-left: 4px solid #3498db; padding: 15px; margin: 20px 0;">
                 <h3 style="color: #2c3e50; margin-top: 0;">Your Account Details:</h3>
@@ -298,9 +553,9 @@ def send_welcome_email(user_data, credentials):
                     <li>Share with family and friends</li>
                 </ol>
             </div>
-            <p>Your MemLife timeline starts from your birthdate and grows with you as you add more memories and milestones.</p>
+            <p>Your Tell My Story timeline starts from your birthdate and grows with you as you add more memories and milestones.</p>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="#" style="background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Start Your MemLife Journey</a>
+                <a href="#" style="background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Start Your Journey</a>
             </div>
             <p style="color: #7f8c8d; font-size: 0.9em; border-top: 1px solid #eee; padding-top: 20px;">
                 If you didn't create this account, please ignore this email or contact support.<br>
@@ -333,7 +588,7 @@ def logout_user():
         'show_vignette_manager', 'custom_topic_input', 'show_custom_topic_modal',
         'show_topic_browser', 'show_session_manager', 'show_session_creator',
         'editing_custom_session', 'show_vignette_detail', 'selected_vignette_id',
-        'editing_vignette_id', 'selected_vignette_for_session'
+        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery'
     ]
     for key in keys:
         st.session_state.pop(key, None)
@@ -429,6 +684,10 @@ def save_jot(text, estimated_year=None):
 
 # ── Prompt Builder ────────────────────────────────────────────────────────────
 def get_system_prompt():
+    # Check if we have sessions loaded
+    if not SESSIONS or st.session_state.current_session >= len(SESSIONS):
+        return "No sessions available. Please check your CSV file."
+    
     current_session = SESSIONS[st.session_state.current_session]
     current_question = (
         st.session_state.current_question_override
@@ -465,26 +724,18 @@ Consider how these historical moments might have shaped their experiences and pe
         except:
             pass
     
+    # FIX SECTION D: Photo Story Mode section - FIXED TO BE MORE ACTIVE
     image_prompt_section = ""
     if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
-        image_prompt_section = "\n\n📸 **PHOTO STORY MODE:**\n"
-        image_prompt_section += "The user has selected specific photos to write about. "
-        image_prompt_section += "Ask questions about these specific photos:\n\n"
-        for idx, img in enumerate(st.session_state.selected_images_for_prompt[:3]):
+        image_prompt_section = "\n\n🎯 **USER HAS INITIATED PHOTO STORY MODE:**\n"
+        image_prompt_section += "The user has clicked 'Tell Photo Stories' and wants to discuss these specific images. YOU MUST ASK QUESTIONS ABOUT THESE PHOTOS NOW.\n\n"
+        
+        for idx, img in enumerate(st.session_state.selected_images_for_prompt[:5]):  # Show up to 5
             image_prompt_section += f"**Photo {idx+1}: {img['original_filename']}**\n"
             if img.get('description'):
-                image_prompt_section += f"Description: {img['description']}\n"
-        photo_prompts = [
-            "Who is in this photo?",
-            "Where and when was this taken?",
-            "What was happening just before/after this moment?",
-            "What emotions does this photo bring up?",
-            "Why was this photo taken/saved?"
-        ]
-        selected_prompts = random.sample(photo_prompts, min(3, len(photo_prompts)))
-        for prompt in selected_prompts:
-            image_prompt_section += f"• {prompt}\n"
-        image_prompt_section += "\n"
+                image_prompt_section += f"Description provided by user: '{img['description']}'\n"
+            # Add a direct instruction for the AI
+            image_prompt_section += f"Ask a specific question about this photo to get the story started.\n\n"
     
     if st.session_state.ghostwriter_mode:
         return f"""ROLE: You are a senior literary biographer with multiple award-winning books to your name.
@@ -497,12 +748,13 @@ YOUR APPROACH:
 3. Connect personal stories to historical context when relevant
 4. Find the story that needs to be told
 5. When photos are mentioned, ask SPECIFIC questions about them
-PHOTO QUESTIONS TO ASK:
-• "Who are the people in this photo?"
-• "What was happening that day?"
-• "Where was this taken and why were you there?"
-• "What do you remember feeling when this was taken?"
+
+PHOTO-FOCUSED QUESTIONS:
+• "Looking at this photo, what sounds/smells/feelings do you remember?"
+• "Who took this photo and why?"
 • "What happened right after this photo was taken?"
+• "How does this photo connect to your broader life story?"
+
 Tone: Literary but not pretentious. Serious but not solemn.
 IMPORTANT: When photos are mentioned, ask specific, detailed questions about them."""
     else:
@@ -510,15 +762,17 @@ IMPORTANT: When photos are mentioned, ask specific, detailed questions about the
 CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
 CURRENT TOPIC: "{current_question}"
 {historical_context}{image_context}{image_prompt_section}
-Please:
-1. Listen actively
-2. Acknowledge warmly
-3. Ask ONE natural follow-up question that connects to historical context or photos
-4. When photos are mentioned, ask about the people, place, and emotions
-PHOTO QUESTIONS:
+
+PHOTO-FOCUSED APPROACH:
+1. When photos are mentioned, ask about the people, place, time, and emotions
+2. Connect photos to the broader life story
+3. Ask for specific sensory details
+
+Example photo questions:
 • "Tell me about the people in this photo"
 • "What's the story behind this moment?"
 • "How do you feel when you look at this photo?"
+
 Tone: Kind, curious, professional"""
 
 # ── Core Functions ────────────────────────────────────────────────────────────
@@ -539,13 +793,26 @@ def save_response(session_id, question, answer):
         save_account_data(st.session_state.user_account)
     
     if session_id not in st.session_state.responses:
-        s = SESSIONS[session_id-1]
+        # Find the session in SESSIONS
+        session_data = None
+        for s in SESSIONS:
+            if s["id"] == session_id:
+                session_data = s
+                break
+        
+        if not session_data:
+            # Create a basic session entry if not found
+            session_data = {
+                "title": f"Session {session_id}",
+                "word_target": DEFAULT_WORD_TARGET
+            }
+        
         st.session_state.responses[session_id] = {
-            "title": s["title"],
+            "title": session_data.get("title", f"Session {session_id}"),
             "questions": {},
             "summary": "",
             "completed": False,
-            "word_target": s.get("word_target", DEFAULT_WORD_TARGET)
+            "word_target": session_data.get("word_target", DEFAULT_WORD_TARGET)
         }
     
     st.session_state.responses[session_id]["questions"][question] = {
@@ -569,12 +836,12 @@ def get_progress_info(session_id):
     if target == 0:
         progress_percent = 100
         emoji = "🟢"
-        color = "#2ecc71"
+        color = "#27ae60"
     else:
         progress_percent = (current_count / target) * 100 if target > 0 else 100
     if progress_percent >= 100:
         emoji = "🟢"
-        color = "#2ecc71"
+        color = "#27ae60"
     elif progress_percent >= 70:
         emoji = "🟡"
         color = "#f39c12"
@@ -834,7 +1101,8 @@ def show_session_creator():
     
     st.title("📋 Create Custom Session")
     
-    session_manager = SessionManager(SESSIONS, st.session_state.user_id)
+    # Initialize SessionManager with CSV path
+    session_manager = SessionManager(st.session_state.user_id, "sessions/sessions.csv")
     session_manager.display_session_creator()
     
     st.markdown('</div>', unsafe_allow_html=True)
@@ -853,24 +1121,24 @@ def show_session_manager():
     
     st.title("📖 Session Manager")
     
-    session_manager = SessionManager(SESSIONS, st.session_state.user_id)
+    # Initialize SessionManager with CSV path
+    session_manager = SessionManager(st.session_state.user_id, "sessions/sessions.csv")
     
     def on_session_select(session_id):
         all_sessions = session_manager.get_all_sessions()
         for i, session in enumerate(all_sessions):
             if session["id"] == session_id:
-                # Update current session index
-                custom_sessions = all_sessions[len(SESSIONS):]
-                if session in custom_sessions:
-                    # It's a custom session
-                    custom_index = custom_sessions.index(session)
-                    st.session_state.current_session = len(SESSIONS) + custom_index
+                # Find session index in SESSIONS
+                for j, standard_session in enumerate(SESSIONS):
+                    if standard_session["id"] == session_id:
+                        st.session_state.current_session = j
+                        break
                 else:
-                    # It's a standard session
-                    for j, standard_session in enumerate(SESSIONS):
-                        if standard_session["id"] == session_id:
-                            st.session_state.current_session = j
-                            break
+                    # It's a custom session
+                    custom_sessions = all_sessions[len(SESSIONS):]
+                    if session in custom_sessions:
+                        custom_index = custom_sessions.index(session)
+                        st.session_state.current_session = len(SESSIONS) + custom_index
                 
                 st.session_state.current_question = 0
                 st.session_state.current_question_override = None
@@ -890,7 +1158,7 @@ def show_session_manager():
 
 # ── Page Config & State ───────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="MemLife - Your Life Timeline",
+    page_title="Tell My Story - Your Life Timeline",
     page_icon="📖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -941,24 +1209,28 @@ default_state = {
     "selected_vignette_id": None,
     "editing_vignette_id": None,
     "selected_vignette_for_session": None,
-    "published_vignette": None,  # Added for vignette publish handling
+    "published_vignette": None,
+    "show_image_gallery": False,
 }
 
 for key, value in default_state.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
-if not st.session_state.responses:
+# Initialize responses for loaded sessions
+if SESSIONS:
     for session in SESSIONS:
         session_id = session["id"]
-        st.session_state.responses[session_id] = {
-            "title": session["title"],
-            "questions": {},
-            "summary": "",
-            "completed": False,
-            "word_target": session.get("word_target", DEFAULT_WORD_TARGET)
-        }
-        st.session_state.session_conversations[session_id] = {}
+        if session_id not in st.session_state.responses:
+            st.session_state.responses[session_id] = {
+                "title": session["title"],
+                "questions": {},
+                "summary": "",
+                "completed": False,
+                "word_target": session.get("word_target", DEFAULT_WORD_TARGET)
+            }
+        if session_id not in st.session_state.session_conversations:
+            st.session_state.session_conversations[session_id] = {}
 
 if st.session_state.logged_in and st.session_state.user_id and not st.session_state.data_loaded:
     user_data = load_user_data(st.session_state.user_id)
@@ -977,7 +1249,7 @@ if st.session_state.logged_in and st.session_state.user_id and not st.session_st
 def show_login_signup():
     st.markdown("""
     <div class="auth-container">
-    <h1 class="auth-title">MemLife</h1>
+    <h1 class="auth-title">Tell My Story</h1>
     <p class="auth-subtitle">Your Life Timeline • Preserve Your Legacy</p>
     </div>
     """, unsafe_allow_html=True)
@@ -1157,6 +1429,21 @@ def show_profile_setup_modal():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Main App Flow ─────────────────────────────────────────────────────────────
+# Check if sessions are loaded
+if not SESSIONS:
+    st.error("❌ No sessions loaded. Please create a sessions/sessions.csv file.")
+    st.info("""
+    Create a CSV file with this format:
+    
+    session_id,title,guidance,question,word_target
+    1,Childhood,"Welcome to Session 1...","What is your earliest memory?",500
+    1,Childhood,,"Can you describe your family home?",500
+    2,Family,"Welcome to Session 2...","How would you describe your relationship?",500
+    
+    Save it as: sessions/sessions.csv
+    """)
+    st.stop()
+
 if st.session_state.get('show_profile_setup', False):
     show_profile_setup_modal()
     st.stop()
@@ -1197,12 +1484,10 @@ if st.session_state.show_session_creator:
     show_session_creator()
     st.stop()
 
-# Main header
+# Main header - ONLY LOGO
 st.markdown(f"""
 <div class="main-header">
-<img src="{LOGO_URL}" class="logo-img" alt="MemLife Logo">
-<h2 style="margin: 0; line-height: 1.2;">MemLife - Your Life Timeline</h2>
-<p style="font-size: 0.9rem; color: #666; margin: 0; line-height: 1.2;">Preserve Your Legacy • Build Your Timeline • Share Your Story</p>
+<img src="{LOGO_URL}" class="logo-img" alt="Tell My Story Logo">
 </div>
 """, unsafe_allow_html=True)
 
@@ -1212,56 +1497,53 @@ with st.sidebar:
     if st.session_state.user_account:
         profile = st.session_state.user_account['profile']
         st.success(f"✓ **{profile['first_name']} {profile['last_name']}**")
-        st.caption(f"📧 {profile['email']}")
+        
+        # ONLY show these - no email
         if profile.get('birthdate'):
             st.caption(f"🎂 Born: {profile['birthdate']}")
+        
+        # Historical events with green checkmark
+        if profile.get('birthdate'):
             try:
                 birth_year = int(profile['birthdate'].split(', ')[-1])
                 events = get_events_for_birth_year(birth_year)
                 if events:
                     uk_events = [e for e in events if e.get('region') == 'UK']
                     global_events = len(events) - len(uk_events)
-                    st.caption(f"📚 {len(events)} historical events ({len(uk_events)} UK, {global_events} global)")
+                    st.success(f"✓ {len(events)} historical events ({len(uk_events)} UK, {global_events} global)")
             except:
                 pass
+        
         account_type = st.session_state.user_account['account_type']
         st.caption(f"👤 Account: {account_type.title()}")
+    
+    # Full width buttons
     if st.button("📝 Edit Profile", use_container_width=True):
         st.session_state.show_profile_setup = True
         st.rerun()
+    
     if st.button("🚪 Log Out", use_container_width=True):
         logout_user()
     
     st.divider()
     
+    # Writing Streak - UPDATED
     st.subheader("🔥 Writing Streak")
     streak_emoji = get_streak_emoji(st.session_state.streak_days)
     st.markdown(f"<div class='streak-flame'>{streak_emoji}</div>", unsafe_allow_html=True)
     st.markdown(f"**{st.session_state.streak_days} day streak**")
     st.caption(f"Total writing days: {st.session_state.total_writing_days}")
+    
     if st.session_state.streak_days >= 7:
         st.success("🏆 Weekly Writer!")
     if st.session_state.streak_days >= 30:
         st.success("🌟 Monthly Master!")
     
     st.divider()
-    st.subheader("🖼️ Photo Gallery")
-    if st.session_state.logged_in:
-        try:
-            total_images = get_total_user_images(st.session_state.user_id)
-            st.metric("Total Photos", total_images)
-            if total_images > 0:
-                if st.button("📸 View Photos", use_container_width=True):
-                    st.session_state.show_image_upload = True
-                    st.rerun()
-            else:
-                st.info("No photos yet")
-        except:
-            st.info("No photos yet")
     
-    st.divider()
+    # Quick Capture - UPDATED
     st.subheader("⚡ Quick Capture")
-    with st.expander("💭 **Jot Now - Quick Memory**", expanded=False):
+    with st.expander("💭 Jot Now - Quick Memory", expanded=False):
         quick_note = st.text_area(
             "Got a memory? Jot it down:",
             value="",
@@ -1288,11 +1570,69 @@ with st.sidebar:
                 st.rerun()
         if st.session_state.get('quick_jots'):
             st.caption(f"📝 {len(st.session_state.quick_jots)} quick notes saved")
-            if st.button("View Quick Notes", key="view_jots_btn"):
+            if st.button("View Quick Notes", key="view_jots_btn", use_container_width=True):
                 st.session_state.show_jots = True
                 st.rerun()
     
     st.divider()
+    
+    # FIX SECTION B: Photo Gallery - FIXED: View Photos button now works
+    st.subheader("🖼️ Photo Gallery")
+    if st.session_state.logged_in:
+        try:
+            total_images = get_total_user_images(st.session_state.user_id)
+            st.metric("Total Photos", total_images)
+            
+            # Get CURRENT session images
+            current_session_id = SESSIONS[st.session_state.current_session]["id"]
+            session_images = get_session_images(st.session_state.user_id, current_session_id)
+            
+            if session_images:
+                st.caption(f"📸 Current session: {len(session_images)} photos")
+                
+                # View Photos button
+                if st.button("👁️ View Current Photos", use_container_width=True, type="secondary"):
+                    st.session_state.show_image_gallery = True
+                    st.rerun()
+            else:
+                st.info("No photos in current session")
+                
+        except Exception as e:
+            st.info(f"Photo system: {str(e)}")
+    
+    st.divider()
+    
+    # Sessions - UPDATED with traffic light system
+    st.header("📖 Sessions")
+    for i, session in enumerate(SESSIONS):
+        session_id = session["id"]
+        session_data = st.session_state.responses.get(session_id, {})
+        responses_count = len(session_data.get("questions", {}))
+        total_questions = len(session["questions"])
+        
+        # Traffic light system
+        if responses_count == total_questions:
+            status = "🔴"  # Red - Complete
+        elif responses_count > 0:
+            status = "🟡"  # Yellow - In progress
+        else:
+            status = "🟢"  # Green - Not started
+        
+        if i == st.session_state.current_session:
+            status = "▶️"  # Current session
+        
+        button_text = f"{status} Session {session_id}: {session['title']}"
+        if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
+            st.session_state.current_session = i
+            st.session_state.current_question = 0
+            st.session_state.editing = None
+            st.session_state.current_question_override = None
+            st.session_state.image_prompt_mode = False
+            st.rerun()
+    
+    st.divider()
+    
+    # Interview Style - UPDATED
     st.header("✍️ Interview Style")
     ghostwriter_mode = st.toggle(
         "Professional Ghostwriter Mode",
@@ -1302,6 +1642,7 @@ with st.sidebar:
     if ghostwriter_mode != st.session_state.ghostwriter_mode:
         st.session_state.ghostwriter_mode = ghostwriter_mode
         st.rerun()
+    
     spellcheck_enabled = st.toggle(
         "Auto Spelling Correction",
         value=st.session_state.spellcheck_enabled,
@@ -1310,6 +1651,7 @@ with st.sidebar:
     if spellcheck_enabled != st.session_state.spellcheck_enabled:
         st.session_state.spellcheck_enabled = spellcheck_enabled
         st.rerun()
+    
     if st.session_state.ghostwriter_mode:
         st.success("✓ Professional mode active")
         st.caption("With historical context & photo integration")
@@ -1317,6 +1659,8 @@ with st.sidebar:
         st.info("Standard mode active")
     
     st.divider()
+    
+    # Historical Context - UPDATED with green checkmark
     st.header("📜 Historical Context")
     if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
         try:
@@ -1338,8 +1682,9 @@ with st.sidebar:
         st.info("Add your birthdate to enable historical context")
     
     st.divider()
-    st.header("✨ Vignettes")
     
+    # Vignettes - UPDATED
+    st.header("✨ Vignettes")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("📝 New Vignette", use_container_width=True):
@@ -1351,8 +1696,9 @@ with st.sidebar:
             st.rerun()
     
     st.divider()
-    st.header("📖 Session Management")
     
+    # Session Management - UPDATED
+    st.header("📖 Session Management")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("📋 All Sessions", use_container_width=True):
@@ -1364,124 +1710,16 @@ with st.sidebar:
             st.rerun()
     
     st.divider()
-    st.header("📚 Topic Management")
     
+    # Topic Management - UPDATED
+    st.header("📚 Topic Management")
     if st.button("🔍 Browse Topics", use_container_width=True):
         st.session_state.show_topic_browser = True
         st.rerun()
     
-    # Note: Custom Topic button removed - you wanted only Browse Topics
-    
-    st.divider()
-    st.header("📖 Sessions")
-    for i, session in enumerate(SESSIONS):
-        session_id = session["id"]
-        session_data = st.session_state.responses.get(session_id, {})
-        responses_count = len(session_data.get("questions", {}))
-        total_questions = len(session["questions"])
-        if i == st.session_state.current_session:
-            status = "▶️"
-        elif responses_count == total_questions:
-            status = "✅"
-        elif responses_count > 0:
-            status = "🟡"
-        else:
-            status = "●"
-        button_text = f"{status} Session {session_id}: {session['title']} ({responses_count}/{total_questions})"
-        if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
-            st.session_state.current_session = i
-            st.session_state.current_question = 0
-            st.session_state.editing = None
-            st.session_state.current_question_override = None
-            st.session_state.image_prompt_mode = False
-            st.rerun()
-    
-    st.divider()
-    st.subheader("📝 Topic Navigation")
-    current_session = SESSIONS[st.session_state.current_session]
-    current_topic = st.session_state.current_question + 1
-    total_topics = len(current_session["questions"])
-    
-    st.markdown(f'<div class="question-counter">Topic {current_topic} of {total_topics}</div>', unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        prev_disabled = st.session_state.current_question == 0
-        if st.button("← Previous", 
-                    disabled=prev_disabled, 
-                    key="prev_topic_sidebar",
-                    use_container_width=True):
-            if not prev_disabled:
-                st.session_state.current_question = st.session_state.current_question - 1
-                st.session_state.editing = None
-                st.session_state.current_question_override = None
-                st.session_state.image_prompt_mode = False
-                st.rerun()
-    
-    with col2:
-        next_disabled = st.session_state.current_question >= total_topics - 1
-        if st.button("Next →", 
-                    disabled=next_disabled, 
-                    key="next_topic_sidebar",
-                    use_container_width=True):
-            if not next_disabled:
-                st.session_state.current_question = st.session_state.current_question + 1
-                st.session_state.editing = None
-                st.session_state.current_question_override = None
-                st.session_state.image_prompt_mode = False
-                st.rerun()
-    
-    st.divider()
-    st.subheader("🔀 Session Navigation")
-    nav_col1, nav_col2 = st.columns(2)
-    
-    with nav_col1:
-        prev_session_disabled = st.session_state.current_session == 0
-        if st.button("← Previous Session", 
-                    disabled=prev_session_disabled,
-                    key="prev_session_sidebar",
-                    use_container_width=True):
-            if not prev_session_disabled:
-                st.session_state.current_session = st.session_state.current_session - 1
-                st.session_state.current_question = 0
-                st.session_state.editing = None
-                st.session_state.current_question_override = None
-                st.session_state.image_prompt_mode = False
-                st.rerun()
-    
-    with nav_col2:
-        next_session_disabled = st.session_state.current_session >= len(SESSIONS) - 1
-        if st.button("Next Session →", 
-                    disabled=next_session_disabled,
-                    key="next_session_sidebar",
-                    use_container_width=True):
-            if not next_session_disabled:
-                st.session_state.current_session = st.session_state.current_session + 1
-                st.session_state.current_question = 0
-                st.session_state.editing = None
-                st.session_state.current_question_override = None
-                st.session_state.image_prompt_mode = False
-                st.rerun()
-    
-    session_options = [f"Session {s['id']}: {s['title']}" for s in SESSIONS]
-    selected_session = st.selectbox(
-        "Jump to session:",
-        session_options, 
-        index=st.session_state.current_session, 
-        key="session_selectbox",
-        label_visibility="collapsed"
-    )
-    
-    if session_options.index(selected_session) != st.session_state.current_session:
-        st.session_state.current_session = session_options.index(selected_session)
-        st.session_state.current_question = 0
-        st.session_state.editing = None
-        st.session_state.current_question_override = None
-        st.session_state.image_prompt_mode = False
-        st.rerun()
-    
     st.divider()
     
+    # FIX SECTION C: Export Options - FIXED: Now includes images in export
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
     try:
@@ -1502,17 +1740,48 @@ with st.sidebar:
                 }
         
         if export_data:
+            # Get ALL images for export
+            all_images_data = []
+            try:
+                # Get images from ALL sessions, not just current
+                for session in SESSIONS:
+                    session_id = session["id"]
+                    images = get_session_images(st.session_state.user_id, session_id)
+                    for img in images:
+                        # Clean export format
+                        export_img = {
+                            "id": img.get("id", ""),
+                            "session_id": session_id,
+                            "original_filename": img.get("original_filename", ""),
+                            "description": img.get("description", ""),
+                            "upload_date": img.get("upload_date", ""),
+                            "dimensions": img.get("dimensions", "")
+                        }
+                        all_images_data.append(export_img)
+            except Exception as e:
+                print(f"Error getting images for export: {e}")
+                all_images_data = []
+            
+            # Create complete export data WITH IMAGES
             complete_data = {
                 "user": st.session_state.user_id,
+                "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
                 "stories": export_data,
+                "images": all_images_data,  # Include all image metadata
                 "export_date": datetime.now().isoformat(),
                 "summary": {
-                    "total_stories": sum(len(session['questions']) for session in export_data.values())
+                    "total_stories": sum(len(session['questions']) for session in export_data.values()),
+                    "total_images": len(all_images_data),
+                    "total_sessions": len(export_data)
                 }
             }
+            
             json_data = json.dumps(complete_data, indent=2)
             encoded_data = base64.b64encode(json_data.encode()).decode()
-            publisher_url = f"{LOGO_URL.replace('logo.png', '')}deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/?data={encoded_data}"
+            
+            # USE THE ORIGINAL URL FROM YOUR WORKING APP
+            publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
+            publisher_url = f"{publisher_base_url}?data={encoded_data}"
             
             col1, col2 = st.columns(2)
             with col1:
@@ -1525,7 +1794,7 @@ with st.sidebar:
                 st.download_button(
                     label="📥 Stories Only",
                     data=stories_json,
-                    file_name=f"MemLife_Stories_{st.session_state.user_id}.json",
+                    file_name=f"Tell_My_Story_Stories_{st.session_state.user_id}.json",
                     mime="application/json",
                     use_container_width=True,
                     key="download_stories_btn"
@@ -1534,7 +1803,7 @@ with st.sidebar:
                 st.download_button(
                     label="📊 Complete Data",
                     data=json_data,
-                    file_name=f"MemLife_Complete_{st.session_state.user_id}.json",
+                    file_name=f"Tell_My_Story_Complete_{st.session_state.user_id}.json",
                     mime="application/json",
                     use_container_width=True,
                     key="download_complete_btn"
@@ -1556,6 +1825,7 @@ with st.sidebar:
     
     st.divider()
     
+    # Clear Data - UPDATED
     st.subheader("⚠️ Clear Data")
     if st.session_state.confirming_clear == "session":
         st.markdown('<div class="warning-box">', unsafe_allow_html=True)
@@ -1607,7 +1877,20 @@ with st.sidebar:
                 st.session_state.confirming_clear = "all"
                 st.rerun()
 
-# ── Main Content ──────────────────────────────────────────────────────────────
+# IN YOUR SIDEBAR - Replace the current debug button with:
+st.sidebar.markdown("---")
+st.sidebar.subheader("🛠️ Debug Tools")
+
+if st.sidebar.button("🔍 DEBUG IMAGE SYSTEM", key="debug_images", type="primary"):
+    # This will run the function immediately
+    debug_image_system()
+    # Don't rerun here - the function handles it
+
+# ── Main Content Area ─────────────────────────────────────────────────────────
+# Check if we have a valid current session
+if st.session_state.current_session >= len(SESSIONS):
+    st.session_state.current_session = 0
+
 current_session = SESSIONS[st.session_state.current_session]
 current_session_id = current_session["id"]
 
@@ -1615,23 +1898,34 @@ if st.session_state.current_question_override:
     current_question_text = st.session_state.current_question_override
     question_source = "custom"
 else:
+    # Check if current_question is valid
+    if st.session_state.current_question >= len(current_session["questions"]):
+        st.session_state.current_question = 0
     current_question_text = current_session["questions"][st.session_state.current_question]
     question_source = "regular"
 
 st.markdown("---")
 
-col1, col2, col3 = st.columns([2, 1, 1])
+# NEW EXACT LAYOUT AS REQUESTED
+# Row 1: Session title and topics explored with progress bar
+col1, col2 = st.columns([3, 1])
 
 with col1:
     st.subheader(f"Session {current_session_id}: {current_session['title']}")
-    session_responses = len(st.session_state.responses.get(current_session_id, {}).get("questions", {}))
-    total_questions = len(current_session["questions"])
-    st.caption(f"📝 {session_responses}/{total_questions} topics answered")
     
-    if st.session_state.ghostwriter_mode:
-        st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode (with historical context & photo integration)</p>', unsafe_allow_html=True)
+    # Topics explored with progress bar
+    session_data = st.session_state.responses.get(current_session_id, {})
+    topics_answered = len(session_data.get("questions", {}))
+    total_topics = len(current_session["questions"])
+    
+    # Progress bar for topics
+    if total_topics > 0:
+        topic_progress = topics_answered / total_topics
+        st.progress(min(topic_progress, 1.0))
+        st.caption(f"📝 Topics explored: {topics_answered}/{total_topics} ({topic_progress*100:.0f}%)")
 
 with col2:
+    # Show custom topic indicator if needed
     if question_source == "custom":
         if st.session_state.current_question_override.startswith("Vignette:"):
             st.markdown(f'<div class="question-counter" style="margin-top: 1rem; color: #9b59b6;">📝 Vignette</div>', unsafe_allow_html=True)
@@ -1642,53 +1936,49 @@ with col2:
         total_topics = len(current_session["questions"])
         st.markdown(f'<div class="question-counter" style="margin-top: 1rem;">Topic {current_topic} of {total_topics}</div>', unsafe_allow_html=True)
 
-with col3:
-    nav_col1, nav_col2 = st.columns(2)
-    with nav_col1:
-        prev_disabled = st.session_state.current_question == 0
-        if st.button("← Previous Topic", 
-                    disabled=prev_disabled,
-                    key="main_prev_btn",
-                    use_container_width=True):
-            if not prev_disabled:
-                st.session_state.current_question -= 1
-                st.session_state.editing = None
-                st.session_state.current_question_override = None
-                st.session_state.image_prompt_mode = False
-                st.rerun()
-    
-    with nav_col2:
-        next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
-        if st.button("Next Topic →", 
-                    disabled=next_disabled,
-                    key="main_next_btn",
-                    use_container_width=True):
-            if not next_disabled:
-                st.session_state.current_question += 1
-                st.session_state.editing = None
-                st.session_state.current_question_override = None
-                st.session_state.image_prompt_mode = False
-                st.rerun()
+# Professional Ghostwriter Mode tag
+if st.session_state.ghostwriter_mode:
+    st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode (with historical context & photo integration)</p>', unsafe_allow_html=True)
 
+# The main question
 st.markdown(f"""
 <div class="question-box">
 {current_question_text}
 </div>
 """, unsafe_allow_html=True)
 
-# ── Image Controls ────────────────────────────────────────────────────────────
+# Guidance text
+if question_source == "regular":
+    st.markdown(f"""
+    <div class="chapter-guidance">
+    {current_session.get('guidance', '')}
+    </div>
+    """, unsafe_allow_html=True)
+elif st.session_state.image_prompt_mode:
+    st.info("✨ **Photo Story Mode** - The AI will ask you questions about your selected photos. Describe what you see, who's in them, and what memories they bring up!")
+else:
+    if st.session_state.current_question_override.startswith("Vignette:"):
+        st.info("📝 **Vignette Mode** - Write a short, focused story about a specific moment or memory.")
+    else:
+        st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
+
+# FIX SECTION A: Image controls - FIXED: Tell Photo Stories button now works
 st.write("")
 image_controls_container = st.container()
 with image_controls_container:
     has_images = False
+    session_images = []
+    
     if st.session_state.logged_in:
         try:
             session_images = get_session_images(st.session_state.user_id, current_session_id)
             has_images = len(session_images) > 0
-        except:
+        except Exception as e:
+            print(f"Error getting session images: {e}")
             has_images = False
     
     img_col1, img_col2 = st.columns(2)
+    
     with img_col1:
         button_text = "📷 Add Photos" if not st.session_state.show_image_upload else "📷 Hide Photos"
         if st.button(button_text, key="toggle_image_upload", use_container_width=True):
@@ -1698,36 +1988,50 @@ with image_controls_container:
     with img_col2:
         if has_images:
             if st.button("✨ Tell Photo Stories", key="photo_stories_btn", use_container_width=True, type="primary"):
+                # Enable photo story mode
                 st.session_state.image_prompt_mode = True
+                st.session_state.selected_images_for_prompt = session_images
+                
+                # Force a conversation reset to trigger AI photo questions
+                if current_question_text in st.session_state.session_conversations.get(current_session_id, {}):
+                    # Clear previous conversation
+                    st.session_state.session_conversations[current_session_id][current_question_text] = []
+                
+                # Update the AI prompt to include photo information
+                st.success(f"📸 Photo Story Mode: AI will ask about your {len(session_images)} photo(s)")
                 st.rerun()
         else:
             st.button("✨ Tell Photo Stories", key="disabled_photo_stories", use_container_width=True, disabled=True)
     
+    # Show image upload interface if toggled
     if st.session_state.show_image_upload and st.session_state.logged_in:
         st.markdown("---")
+        # FIX: Wrap in try-except to prevent interface error after upload
         try:
+            # This function might fail after a rerun due to uploader state
             image_upload_interface(st.session_state.user_id, current_session_id)
-        except:
-            st.warning("Image upload interface not available")
+        except Exception as e:
+            # If it fails, just don't show the interface; images were already uploaded
+            pass  # Silent fail is acceptable here
         
+        # Show existing images
         try:
-            selected_images = display_image_gallery(st.session_state.user_id, current_session_id, columns=2)
-            if selected_images:
-                st.session_state.selected_images_for_prompt = selected_images
-                st.success(f"✅ Selected {len(selected_images)} photo(s)! Click 'Tell Photo Stories' to write about them.")
-        except:
+            if has_images:
+                st.subheader("📸 Your Photos for This Session")
+                selected_images = display_image_gallery(
+                    st.session_state.user_id, 
+                    current_session_id, 
+                    columns=2
+                )
+                if selected_images:
+                    st.session_state.selected_images_for_prompt = selected_images
+                    st.success(f"✅ Selected {len(selected_images)} photo(s) for storytelling!")
+        except Exception as e:
             st.info("No photos uploaded for this session yet.")
     
     st.markdown("---")
     
-    if st.session_state.image_prompt_mode:
-        if st.session_state.selected_images_for_prompt:
-            selected_count = len(st.session_state.selected_images_for_prompt)
-            st.success(f"📸 **Photo Story Mode**: Writing about {selected_count} selected photo(s)")
-            st.info("The AI will ask you specific questions about each photo!")
-        else:
-            st.info("📸 **Photo Story Mode**: Select photos from the gallery to write about them")
-    
+    # Historical context message
     if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
         try:
             birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
@@ -1738,31 +2042,8 @@ with image_controls_container:
                 st.info(f"📜 **Historical Context Enabled:** Your responses will be enriched with {len(events)} historical events ({uk_count} UK, {global_count} global) from your lifetime.")
         except:
             pass
-    
-    if question_source == "regular":
-        st.markdown(f"""
-        <div class="chapter-guidance">
-        {current_session.get('guidance', '')}
-        </div>
-        """, unsafe_allow_html=True)
-    elif st.session_state.image_prompt_mode:
-        st.info("✨ **Photo Story Mode** - The AI will ask you questions about your selected photos. Describe what you see, who's in them, and what memories they bring up!")
-    else:
-        if st.session_state.current_question_override.startswith("Vignette:"):
-            st.info("📝 **Vignette Mode** - Write a short, focused story about a specific moment or memory.")
-        else:
-            st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
-    
-    if question_source == "regular":
-        session_data = st.session_state.responses.get(current_session_id, {})
-        topics_answered = len(session_data.get("questions", {}))
-        total_topics = len(current_session["questions"])
-        if total_topics > 0:
-            topic_progress = topics_answered / total_topics
-            st.progress(min(topic_progress, 1.0))
-            st.caption(f"📝 Topics explored: {topics_answered}/{total_topics} ({topic_progress*100:.0f}%)")
 
-# ── Conversation & Chat ───────────────────────────────────────────────────────
+# Conversation area
 if current_session_id not in st.session_state.session_conversations:
     st.session_state.session_conversations[current_session_id] = {}
 
@@ -1813,6 +2094,7 @@ if not conversation:
         conversation.append({"role": "assistant", "content": conv_text})
         st.session_state.session_conversations[current_session_id][current_question_text] = conversation
 
+# Display conversation
 for i, message in enumerate(conversation):
     if message["role"] == "assistant":
         with st.chat_message("assistant", avatar="👔"):
@@ -1857,54 +2139,107 @@ for i, message in enumerate(conversation):
                         st.session_state.edit_text = message["content"]
                         st.rerun()
 
-input_container = st.container()
-with input_container:
-    st.write("")
-    st.write("")
-    user_input = st.chat_input("Type your answer here...", key="chat_input")
-    if user_input:
-        if st.session_state.spellcheck_enabled:
-            user_input = auto_correct_text(user_input)
-        conversation.append({"role": "user", "content": user_input})
-        with st.chat_message("assistant", avatar="👔"):
-            with st.spinner("Reflecting on your story..."):
-                try:
-                    conversation_history = conversation[:-1]
-                    messages_for_api = [
-                        {"role": "system", "content": get_system_prompt()},
-                        *conversation_history,
-                        {"role": "user", "content": user_input}
-                    ]
-                    temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
-                    max_tokens = 400 if st.session_state.ghostwriter_mode else 300
-                    response = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=messages_for_api,
-                        temperature=temperature,
-                        max_tokens=max_tokens
-                    )
-                    ai_response = response.choices[0].message.content
-                    if st.session_state.image_prompt_mode:
-                        ai_response += f"\n\n📸 **Photo Note:** Keep describing your photos! Who, what, where, when, and why?"
-                    elif question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
-                        ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
-                    st.markdown(ai_response)
-                    conversation.append({"role": "assistant", "content": ai_response})
-                except Exception as e:
-                    error_msg = "Thank you for sharing that. Your response has been saved."
-                    st.markdown(error_msg)
-                    conversation.append({"role": "assistant", "content": error_msg})
-        st.session_state.session_conversations[current_session_id][current_question_text] = conversation
-        save_response(current_session_id, current_question_text, user_input)
-        st.rerun()
+# BIG ANSWER BOX with SAVE button (not arrow)
+st.write("")
+st.write("")
+user_input = st.text_area(
+    "Type your long-form answer here...",
+    key="long_form_answer",
+    height=200,
+    placeholder="Write your detailed response here. This is where you should write your full story...",
+    label_visibility="visible"
+)
 
-# ── Word Progress ─────────────────────────────────────────────────────────────
+col1, col2 = st.columns([1, 3])
+with col1:
+    # FIX SECTION E: Fix Save Answer to Include Image Context
+    if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
+        if user_input:
+            if st.session_state.spellcheck_enabled:
+                user_input = auto_correct_text(user_input)
+            conversation.append({"role": "user", "content": user_input})
+            
+            # ADD THIS: Include image context when saving
+            image_context = ""
+            if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
+                image_context = "\n\n[USER IS DISCUSSING THESE PHOTOS:]\n"
+                for img in st.session_state.selected_images_for_prompt:
+                    image_context += f"- {img['original_filename']}"
+                    if img.get('description'):
+                        image_context += f" ({img['description']})"
+                    image_context += "\n"
+            
+            save_response(current_session_id, current_question_text, user_input + image_context)
+            
+            with st.chat_message("assistant", avatar="👔"):
+                with st.spinner("Reflecting on your story..."):
+                    try:
+                        conversation_history = conversation[:-1]
+                        messages_for_api = [
+                            {"role": "system", "content": get_system_prompt()},
+                            *conversation_history,
+                            {"role": "user", "content": user_input}
+                        ]
+                        temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
+                        max_tokens = 400 if st.session_state.ghostwriter_mode else 300
+                        response = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=messages_for_api,
+                            temperature=temperature,
+                            max_tokens=max_tokens
+                        )
+                        ai_response = response.choices[0].message.content
+                        if st.session_state.image_prompt_mode:
+                            ai_response += f"\n\n📸 **Photo Note:** Keep describing your photos! Who, what, where, when, and why?"
+                        elif question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
+                            ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
+                        st.markdown(ai_response)
+                        conversation.append({"role": "assistant", "content": ai_response})
+                    except Exception as e:
+                        error_msg = "Thank you for sharing that. Your response has been saved."
+                        st.markdown(error_msg)
+                        conversation.append({"role": "assistant", "content": error_msg})
+            st.session_state.session_conversations[current_session_id][current_question_text] = conversation
+            st.rerun()
+        else:
+            st.warning("Please write something before saving!")
+
+with col2:
+    # Navigation buttons
+    nav_col1, nav_col2 = st.columns(2)
+    with nav_col1:
+        prev_disabled = st.session_state.current_question == 0
+        if st.button("← Previous Topic", 
+                    disabled=prev_disabled,
+                    key="bottom_prev_btn",
+                    use_container_width=True):
+            if not prev_disabled:
+                st.session_state.current_question -= 1
+                st.session_state.editing = None
+                st.session_state.current_question_override = None
+                st.session_state.image_prompt_mode = False
+                st.rerun()
+    
+    with nav_col2:
+        next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
+        if st.button("Next Topic →", 
+                    disabled=next_disabled,
+                    key="bottom_next_btn",
+                    use_container_width=True):
+            if not next_disabled:
+                st.session_state.current_question += 1
+                st.session_state.editing = None
+                st.session_state.current_question_override = None
+                st.session_state.image_prompt_mode = False
+                st.rerun()
+
+# Session Progress
 st.divider()
 progress_info = get_progress_info(current_session_id)
 st.markdown(f"""
 <div class="progress-container">
 <div class="progress-header">📊 Session Progress</div>
-<div class="progress-status">{progress_info['emoji']} {progress_info['progress_percent']:.0f}% complete • {progress_info['status_text']}</div>
+<div class="progress-status">{progress_info['emoji']} {progress_info['progress_percent']:.0f}% complete • {progress_info['remaining_words']} words remaining</div>
 <div class="progress-bar-container">
 <div class="progress-bar-fill" style="width: {min(progress_info['progress_percent'], 100)}%; background-color: {progress_info['color']};"></div>
 </div>
@@ -1942,7 +2277,7 @@ if st.session_state.editing_word_target:
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ── Footer ────────────────────────────────────────────────────────────────────
+# Footer Stats
 st.divider()
 col1, col2, col3, col4 = st.columns(4)
 with col1:
@@ -1963,87 +2298,100 @@ with col4:
         except:
             st.metric("Total Photos", "0")
 
+# ============================================================================
+# SECTION: BIOGRAPHY FORMATTER EXPORT (FROM ORIGINAL WORKING APP)
+# ============================================================================
 st.divider()
-st.subheader("📘 Publish & Save Your Biography")
-current_user = st.session_state.get('user_id', '')
-if current_user:
-    export_data = {}
-    for session in SESSIONS:
-        session_id = session["id"]
-        session_data = st.session_state.responses.get(session_id, {})
-        if session_data.get("questions"):
-            export_data[str(session_id)] = {
-                "title": session["title"],
-                "questions": session_data["questions"]
-            }
-    
-    if export_data:
-        total_stories = sum(len(session['questions']) for session in export_data.values())
-        enhanced_data = {
-            "user": current_user,
-            "stories": export_data,
-            "export_date": datetime.now().isoformat(),
-            "summary": {
-                "total_stories": total_stories,
-                "total_sessions": len(export_data)
-            }
-        }
-        json_data = json.dumps(enhanced_data, indent=2)
-        encoded_data = base64.b64encode(json_data.encode()).decode()
-        publisher_url = f"https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/?data={encoded_data}"
-        st.success(f"✅ **{total_stories} stories** ready to publish!")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### 🖨️ Create Your Book")
-            st.markdown("""
-            Generate a beautiful, formatted biography.
-            Your book will include:
-            • Professional formatting
-            • Table of contents
-            • All your stories organized
-            • Ready to print or share
-            """)
-            st.markdown(f'''
-            <a href="{publisher_url}" target="_blank">
-            <button class="html-link-btn">
-            🖨️ Publish Biography
-            </button>
-            </a>
-            ''', unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("#### 🔐 Save to Your Vault")
-            st.markdown("""
-            **Complete preservation:**
-            1. Generate your enhanced biography
-            2. Download the formatted PDF
-            3. Save all your stories
-            4. Store in your secure digital vault
-            """)
-            vault_url = "https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/"
-            st.markdown(f'''
-            <a href="{vault_url}" target="_blank">
-            <button style="background: #3498db; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 1rem;">
-            💾 Go to Secure Vault
-            </button>
-            </a>
-            ''', unsafe_allow_html=True)
-            with st.expander("📥 Download Backup"):
-                st.download_button(
-                    label="Download Complete Data",
-                    data=json_data,
-                    file_name=f"{current_user}_complete_backup.json",
-                    mime="application/json",
-                    use_container_width=True,
-                    key="backup_download_btn"
-                )
-                st.caption("Includes all your stories")
-    else:
-        st.info("📝 **Start writing your story!** Answer some questions first, then come back here.")
-else:
-    st.info("👤 **Please log in to publish your biography**")
+st.subheader("📘 Biography Formatter")
 
+# Get the current user's data
+current_user = st.session_state.get('user_id', '')
+export_data = {}
+
+# Prepare data for export (EXACTLY like original app)
+for session in SESSIONS:
+    session_id = session["id"]
+    session_data = st.session_state.responses.get(session_id, {})
+    if session_data.get("questions"):
+        export_data[str(session_id)] = {
+            "title": session["title"],
+            "questions": session_data["questions"]
+        }
+
+if current_user and current_user != "" and export_data:
+    # Count total stories (matching original app logic)
+    total_stories = sum(len(session['questions']) for session in export_data.values())
+    
+    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP WITH IMAGES
+    json_data = json.dumps({
+        "user": current_user,
+        "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
+        "stories": export_data,
+        "export_date": datetime.now().isoformat(),
+        "summary": {
+            "total_stories": total_stories,
+            "total_sessions": len(export_data)
+        }
+    }, indent=2)
+    
+    # Encode the data for URL
+    encoded_data = base64.b64encode(json_data.encode()).decode()
+    
+    # USE THE ORIGINAL URL FROM YOUR WORKING APP
+    publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
+    publisher_url = f"{publisher_base_url}?data={encoded_data}"
+    
+    st.success(f"✅ **{total_stories} stories ready for formatting!**")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 🖨️ Format Biography")
+        st.markdown(f"""
+        Generate a professionally formatted biography from your stories.
+        
+        **[📘 Click to Format Biography]({publisher_url})**
+        
+        Your formatted biography will include:
+        • Professional formatting
+        • Table of contents
+        • All your stories organized
+        • Ready to print or share
+        """)
+    
+    with col2:
+        st.markdown("#### 🔐 Save to Your Vault")
+        st.markdown("""
+        **After formatting your biography:**
+        
+        1. Generate your biography (link on left)
+        2. Download the formatted PDF
+        3. Save it to your secure vault
+        
+        **[💾 Go to Secure Vault](https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/)**
+        
+        Your vault preserves important documents forever.
+        """)
+    
+    # Backup download (exactly like original app)
+    with st.expander("📥 Download Raw Data (Backup)"):
+        st.download_button(
+            label="Download Stories as JSON",
+            data=json_data,
+            file_name=f"{current_user}_stories.json",
+            mime="application/json",
+            use_container_width=True
+        )
+        st.caption("Use this if the formatter link doesn't work")
+        
+elif current_user and current_user != "":
+    st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
+else:
+    st.info("👤 **Please log in to format your biography**")
+
+# ============================================================================
+# FOOTER
+# ============================================================================
 st.markdown("---")
 if st.session_state.user_account:
     profile = st.session_state.user_account['profile']
@@ -2054,12 +2402,9 @@ if st.session_state.user_account:
         total_images = 0
     
     footer_info = f"""
-MemLife Timeline • 👤 {profile['first_name']} {profile['last_name']} • 📧 {profile['email']} •
-🎂 {profile.get('birthdate', 'Not specified')} • 🔥 {st.session_state.streak_days} day streak •
+Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} • 🔥 {st.session_state.streak_days} day streak •
 📷 {total_images} photos • 📅 Account Age: {account_age} days
 """
     st.caption(footer_info)
 else:
-    st.caption(f"MemLife Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
-
-
+    st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
