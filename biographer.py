@@ -46,71 +46,208 @@ except ImportError as e:
     # Image functions will use fallbacks
 
 # ============================================================================
-# DEBUG FUNCTION - Add this right after imports
+# DEBUG FUNCTION - REPLACE YOUR CURRENT VERSION WITH THIS
 # ============================================================================
 def debug_image_system():
-    """Debug the image system - call this from sidebar"""
+    """Debug the image system - IMMEDIATE RESULTS"""
     import os
+    import json
     
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🛠️ Debug Image System")
+    st.title("🛠️ DEBUG: Image System Analysis")
     
     # Get user ID
     user_id = st.session_state.get('user_id', 'not_logged_in')
-    st.sidebar.write(f"**User ID:** `{user_id}`")
+    st.write(f"**Current User ID:** `{user_id}`")
+    st.write(f"**Logged in:** {st.session_state.get('logged_in', False)}")
     
-    # Check user_images folder
+    # Check current session
+    if 'current_session' in st.session_state:
+        current_session = st.session_state.current_session
+        if SESSIONS and current_session < len(SESSIONS):
+            session_id = SESSIONS[current_session]["id"]
+            st.write(f"**Current Session ID:** {session_id}")
+    
+    st.divider()
+    
+    # 1. Check user_images folder structure
+    st.subheader("📁 Folder Structure")
+    
     base_folder = "user_images"
     user_folder = f"{base_folder}/{user_id}"
     
-    # Create folders if they don't exist
+    st.write(f"**Checking:** `{user_folder}`")
+    
+    # Create if doesn't exist
     os.makedirs(user_folder, exist_ok=True)
+    st.success(f"✅ Created/Confirmed: `{user_folder}`")
     
-    st.sidebar.write(f"**Created folder:** `{user_folder}`")
+    # List all contents
+    if os.path.exists(base_folder):
+        st.write(f"**Contents of `{base_folder}`:**")
+        try:
+            items = os.listdir(base_folder)
+            for item in items:
+                item_path = os.path.join(base_folder, item)
+                if os.path.isdir(item_path):
+                    st.write(f"📁 `{item}/`")
+                    # List user's session folders
+                    if item == user_id:
+                        user_items = os.listdir(item_path)
+                        for user_item in user_items:
+                            st.write(f"   • `{user_item}`")
+                else:
+                    st.write(f"📄 `{item}`")
+        except Exception as e:
+            st.error(f"Cannot list: {e}")
+    else:
+        st.error(f"❌ Base folder `{base_folder}` doesn't exist!")
     
-    # Check metadata file
+    st.divider()
+    
+    # 2. Check metadata file
+    st.subheader("📄 Metadata File")
+    
     metadata_file = f"{user_folder}/image_metadata.json"
+    st.write(f"**File:** `{metadata_file}`")
+    
     if os.path.exists(metadata_file):
+        file_size = os.path.getsize(metadata_file)
+        st.write(f"**Size:** {file_size} bytes")
+        
         try:
             with open(metadata_file, 'r') as f:
-                import json
                 data = json.load(f)
+            
+            if isinstance(data, dict):
                 session_count = len(data)
                 total_images = sum(len(images) for images in data.values())
-                st.sidebar.success(f"✅ Metadata: {session_count} sessions, {total_images} images")
                 
-                # Show session data
-                for session_id, images in data.items():
-                    st.sidebar.write(f"• Session {session_id}: {len(images)} images")
-        except Exception as e:
-            st.sidebar.error(f"❌ Corrupted: {str(e)}")
+                st.success(f"✅ Valid JSON: {session_count} sessions, {total_images} images")
+                
+                if data:
+                    st.write("**Contents:**")
+                    for session_id, images in data.items():
+                        st.write(f"- Session `{session_id}`: {len(images)} images")
+                        for img in images[:2]:  # Show first 2 images
+                            st.write(f"  • `{img.get('original_filename', 'No name')}`")
+                else:
+                    st.info("Empty metadata (no images registered yet)")
+                    
+                # Show full JSON
+                with st.expander("📋 View Raw JSON"):
+                    st.json(data)
+            else:
+                st.error(f"❌ Invalid format: Expected dict, got {type(data)}")
+                st.write(f"Actual content type: {type(data)}")
+                st.write(f"Content: {str(data)[:200]}...")
+                
+        except json.JSONDecodeError as e:
+            st.error(f"❌ Corrupted JSON: {e}")
             
-            # Fix it
+            # Show file content
+            try:
+                with open(metadata_file, 'r') as f:
+                    raw_content = f.read()
+                st.write("**Raw file content:**")
+                st.code(raw_content[:500] + "..." if len(raw_content) > 500 else raw_content)
+            except:
+                st.write("Cannot read file content")
+                
+        except Exception as e:
+            st.error(f"❌ Error reading: {e}")
+    else:
+        st.warning("⚠️ Metadata file doesn't exist")
+        
+        # Create empty one
+        try:
             with open(metadata_file, 'w') as f:
                 json.dump({}, f)
-            st.sidebar.info("Fixed: Reset to empty JSON")
-    else:
-        st.sidebar.info("No metadata file yet")
-        # Create empty file
-        with open(metadata_file, 'w') as f:
-            import json
-            json.dump({}, f)
-        st.sidebar.success("Created empty metadata file")
+            st.success("✅ Created empty metadata file")
+        except Exception as e:
+            st.error(f"❌ Cannot create: {e}")
     
-    # List all files in user folder
+    st.divider()
+    
+    # 3. Test image_manager functions
+    st.subheader("🔧 Function Tests")
+    
     try:
-        files = os.listdir(user_folder)
-        st.sidebar.write(f"**Files in folder:** {len(files)}")
-        for file in files:
-            filepath = f"{user_folder}/{file}"
-            size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
-            st.sidebar.write(f"• `{file}` ({size} bytes)")
+        from image_manager import get_session_images, get_total_user_images, get_session_image_folder
+        
+        st.write("**Testing `get_session_images()`:**")
+        if 'current_session' in st.session_state and SESSIONS:
+            current_session_id = SESSIONS[st.session_state.current_session]["id"]
+            images = get_session_images(user_id, current_session_id)
+            st.write(f"`get_session_images('{user_id}', {current_session_id})`")
+            st.write(f"Result: {len(images)} images")
+            if images:
+                st.write("First image:", images[0].get('original_filename', 'No name'))
+        
+        st.write("**Testing `get_total_user_images()`:**")
+        total = get_total_user_images(user_id)
+        st.write(f"Result: {total} total images")
+        
+        st.write("**Testing `get_session_image_folder()`:**")
+        folder = get_session_image_folder(user_id, 1)
+        st.write(f"Result: `{folder}`")
+        
     except Exception as e:
-        st.sidebar.error(f"Cannot list files: {e}")
+        st.error(f"❌ Function test failed: {e}")
+        import traceback
+        with st.expander("🔍 View Full Traceback"):
+            st.code(traceback.format_exc())
     
-    # Force rerun to refresh
-    if st.sidebar.button("🔄 Refresh & Rerun", key="debug_rerun"):
-        st.rerun()
+    st.divider()
+    
+    # 4. Quick Fix Button
+    st.subheader("⚡ Quick Fix")
+    
+    if st.button("🔄 RESET METADATA FILE", type="primary"):
+        try:
+            # Create backup
+            if os.path.exists(metadata_file):
+                import shutil
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_file = f"{metadata_file}.backup_{timestamp}"
+                shutil.copy2(metadata_file, backup_file)
+                st.info(f"Backup created: `{backup_file}`")
+            
+            # Reset to empty valid JSON
+            with open(metadata_file, 'w') as f:
+                json.dump({}, f, indent=2)
+            
+            st.success("✅ Metadata file reset to empty valid JSON")
+            st.info("Your actual image files are safe. Only the index was reset.")
+            
+            # Auto-rerun
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Reset failed: {e}")
+    
+    if st.button("📁 CREATE ALL MISSING FOLDERS"):
+        try:
+            # Create all possible session folders
+            for i in range(1, 10):
+                folder = f"{user_folder}/session_{i}"
+                os.makedirs(folder, exist_ok=True)
+            
+            # Also create for current session
+            if 'current_session' in st.session_state and SESSIONS:
+                current_session_id = SESSIONS[st.session_state.current_session]["id"]
+                current_folder = f"{user_folder}/session_{current_session_id}"
+                os.makedirs(current_folder, exist_ok=True)
+                st.write(f"Created: `{current_folder}`")
+            
+            st.success("✅ Created all session folders")
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Failed: {e}")
+    
+    st.divider()
+    st.caption("Debug ran at: " + datetime.now().strftime("%H:%M:%S"))
 
 DEFAULT_WORD_TARGET = 500
 
@@ -1773,14 +1910,14 @@ with st.sidebar:
                 st.session_state.confirming_clear = "all"
                 st.rerun()
 
-    # ============================================================================
-    # DEBUG SECTION - Add this at the VERY END of the sidebar
-    # ============================================================================
-    st.sidebar.markdown("---")
-    
-    if st.sidebar.button("🛠️ Debug Image System", key="debug_images"):
-        debug_image_system()
-        st.rerun()
+# IN YOUR SIDEBAR - Replace the current debug button with:
+st.sidebar.markdown("---")
+st.sidebar.subheader("🛠️ Debug Tools")
+
+if st.sidebar.button("🔍 DEBUG IMAGE SYSTEM", key="debug_images", type="primary"):
+    # This will run the function immediately
+    debug_image_system()
+    # Don't rerun here - the function handles it
 
 # ── Main Content Area ─────────────────────────────────────────────────────────
 # Check if we have a valid current session
