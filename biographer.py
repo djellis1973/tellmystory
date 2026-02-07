@@ -2299,7 +2299,7 @@ with col4:
             st.metric("Total Photos", "0")
 
 # ============================================================================
-# SECTION: BIOGRAPHY FORMATTER EXPORT (FROM ORIGINAL WORKING APP)
+# SECTION: BIOGRAPHY FORMATTER EXPORT - FIXED WITH IMAGES
 # ============================================================================
 st.divider()
 st.subheader("📘 Biography Formatter")
@@ -2308,7 +2308,7 @@ st.subheader("📘 Biography Formatter")
 current_user = st.session_state.get('user_id', '')
 export_data = {}
 
-# Prepare data for export (EXACTLY like original app)
+# Prepare stories data for export
 for session in SESSIONS:
     session_id = session["id"]
     session_data = st.session_state.responses.get(session_id, {})
@@ -2319,15 +2319,100 @@ for session in SESSIONS:
         }
 
 if current_user and current_user != "" and export_data:
-    # Count total stories (matching original app logic)
+    # Count total stories
     total_stories = sum(len(session['questions']) for session in export_data.values())
     
-    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP
+    # ======= CRITICAL: GET IMAGES FOR EXPORT =======
+    all_images_data = []
+    if st.session_state.logged_in:
+        try:
+            # Get images from ALL sessions
+            for session in SESSIONS:
+                session_id = session["id"]
+                session_images = get_session_images(st.session_state.user_id, session_id)
+                for img in session_images:
+                    # Clean export format
+                    export_img = {
+                        "id": img.get("id", ""),
+                        "session_id": session_id,
+                        "original_filename": img.get("original_filename", ""),
+                        "description": img.get("description", ""),
+                        "upload_date": img.get("upload_date", ""),
+                        "dimensions": img.get("dimensions", "")
+                    }
+                    all_images_data.append(export_img)
+        except Exception as e:
+            print(f"Error getting images for export: {e}")
+    
+    # Create JSON data for the publisher - WITH IMAGES
     json_data = json.dumps({
         "user": current_user,
+        "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
         "stories": export_data,
-        "export_date": datetime.now().isoformat()
+        "images": all_images_data,  # <<< THIS IS THE CRITICAL LINE
+        "export_date": datetime.now().isoformat(),
+        "summary": {
+            "total_stories": total_stories,
+            "total_images": len(all_images_data),
+            "total_sessions": len(export_data)
+        }
     }, indent=2)
+    
+    # Encode the data for URL
+    encoded_data = base64.b64encode(json_data.encode()).decode()
+    
+    # USE THE ORIGINAL URL FROM YOUR WORKING APP
+    publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
+    publisher_url = f"{publisher_base_url}?data={encoded_data}"
+    
+    st.success(f"✅ **{total_stories} stories ready for formatting!**")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 🖨️ Format Biography")
+        st.markdown(f"""
+        Generate a professionally formatted biography from your stories.
+        
+        **[📘 Click to Format Biography]({publisher_url})**
+        
+        Your formatted biography will include:
+        • Professional formatting
+        • Table of contents
+        • All your stories organized
+        • Photo references
+        • Ready to print or share
+        """)
+    
+    with col2:
+        st.markdown("#### 🔐 Save to Your Vault")
+        st.markdown("""
+        **After formatting your biography:**
+        
+        1. Generate your biography (link on left)
+        2. Download the formatted PDF
+        3. Save it to your secure vault
+        
+        **[💾 Go to Secure Vault](https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/)**
+        
+        Your vault preserves important documents forever.
+        """)
+    
+    # Backup download (exactly like original app)
+    with st.expander("📥 Download Raw Data (Backup)"):
+        st.download_button(
+            label="Download Stories as JSON",
+            data=json_data,
+            file_name=f"{current_user}_stories.json",
+            mime="application/json",
+            use_container_width=True
+        )
+        st.caption(f"Includes {len(all_images_data)} photo references")
+        
+elif current_user and current_user != "":
+    st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
+else:
+    st.info("👤 **Please log in to format your biography**")
     
     # Encode the data for URL
     encoded_data = base64.b64encode(json_data.encode()).decode()
