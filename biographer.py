@@ -14,9 +14,6 @@ import string
 import base64
 import pandas as pd
 import uuid
-from PIL import Image
-import io
-import random
 import sys
 
 # Add current directory to path to import modules
@@ -27,15 +24,6 @@ try:
     from topic_bank import TopicBank
     from session_manager import SessionManager
     from vignettes import VignetteManager
-    from image_manager import (
-        get_session_images,
-        save_uploaded_image,
-        delete_image,
-        display_image_gallery,
-        get_images_for_prompt,
-        get_total_user_images,
-        image_upload_interface
-    )
 except ImportError as e:
     st.error(f"Error importing modules: {e}")
     st.info("Please ensure all .py files are in the same directory")
@@ -43,211 +31,6 @@ except ImportError as e:
     TopicBank = None
     SessionManager = None
     VignetteManager = None
-    # Image functions will use fallbacks
-
-# ============================================================================
-# DEBUG FUNCTION - REPLACE YOUR CURRENT VERSION WITH THIS
-# ============================================================================
-def debug_image_system():
-    """Debug the image system - IMMEDIATE RESULTS"""
-    import os
-    import json
-    
-    st.title("🛠️ DEBUG: Image System Analysis")
-    
-    # Get user ID
-    user_id = st.session_state.get('user_id', 'not_logged_in')
-    st.write(f"**Current User ID:** `{user_id}`")
-    st.write(f"**Logged in:** {st.session_state.get('logged_in', False)}")
-    
-    # Check current session
-    if 'current_session' in st.session_state:
-        current_session = st.session_state.current_session
-        if SESSIONS and current_session < len(SESSIONS):
-            session_id = SESSIONS[current_session]["id"]
-            st.write(f"**Current Session ID:** {session_id}")
-    
-    st.divider()
-    
-    # 1. Check user_images folder structure
-    st.subheader("📁 Folder Structure")
-    
-    base_folder = "user_images"
-    user_folder = f"{base_folder}/{user_id}"
-    
-    st.write(f"**Checking:** `{user_folder}`")
-    
-    # Create if doesn't exist
-    os.makedirs(user_folder, exist_ok=True)
-    st.success(f"✅ Created/Confirmed: `{user_folder}`")
-    
-    # List all contents
-    if os.path.exists(base_folder):
-        st.write(f"**Contents of `{base_folder}`:**")
-        try:
-            items = os.listdir(base_folder)
-            for item in items:
-                item_path = os.path.join(base_folder, item)
-                if os.path.isdir(item_path):
-                    st.write(f"📁 `{item}/`")
-                    # List user's session folders
-                    if item == user_id:
-                        user_items = os.listdir(item_path)
-                        for user_item in user_items:
-                            st.write(f"   • `{user_item}`")
-                else:
-                    st.write(f"📄 `{item}`")
-        except Exception as e:
-            st.error(f"Cannot list: {e}")
-    else:
-        st.error(f"❌ Base folder `{base_folder}` doesn't exist!")
-    
-    st.divider()
-    
-    # 2. Check metadata file
-    st.subheader("📄 Metadata File")
-    
-    metadata_file = f"{user_folder}/image_metadata.json"
-    st.write(f"**File:** `{metadata_file}`")
-    
-    if os.path.exists(metadata_file):
-        file_size = os.path.getsize(metadata_file)
-        st.write(f"**Size:** {file_size} bytes")
-        
-        try:
-            with open(metadata_file, 'r') as f:
-                data = json.load(f)
-            
-            if isinstance(data, dict):
-                session_count = len(data)
-                total_images = sum(len(images) for images in data.values())
-                
-                st.success(f"✅ Valid JSON: {session_count} sessions, {total_images} images")
-                
-                if data:
-                    st.write("**Contents:**")
-                    for session_id, images in data.items():
-                        st.write(f"- Session `{session_id}`: {len(images)} images")
-                        for img in images[:2]:  # Show first 2 images
-                            st.write(f"  • `{img.get('original_filename', 'No name')}`")
-                else:
-                    st.info("Empty metadata (no images registered yet)")
-                    
-                # Show full JSON
-                with st.expander("📋 View Raw JSON"):
-                    st.json(data)
-            else:
-                st.error(f"❌ Invalid format: Expected dict, got {type(data)}")
-                st.write(f"Actual content type: {type(data)}")
-                st.write(f"Content: {str(data)[:200]}...")
-                
-        except json.JSONDecodeError as e:
-            st.error(f"❌ Corrupted JSON: {e}")
-            
-            # Show file content
-            try:
-                with open(metadata_file, 'r') as f:
-                    raw_content = f.read()
-                st.write("**Raw file content:**")
-                st.code(raw_content[:500] + "..." if len(raw_content) > 500 else raw_content)
-            except:
-                st.write("Cannot read file content")
-                
-        except Exception as e:
-            st.error(f"❌ Error reading: {e}")
-    else:
-        st.warning("⚠️ Metadata file doesn't exist")
-        
-        # Create empty one
-        try:
-            with open(metadata_file, 'w') as f:
-                json.dump({}, f)
-            st.success("✅ Created empty metadata file")
-        except Exception as e:
-            st.error(f"❌ Cannot create: {e}")
-    
-    st.divider()
-    
-    # 3. Test image_manager functions
-    st.subheader("🔧 Function Tests")
-    
-    try:
-        from image_manager import get_session_images, get_total_user_images, get_session_image_folder
-        
-        st.write("**Testing `get_session_images()`:**")
-        if 'current_session' in st.session_state and SESSIONS:
-            current_session_id = SESSIONS[st.session_state.current_session]["id"]
-            images = get_session_images(user_id, current_session_id)
-            st.write(f"`get_session_images('{user_id}', {current_session_id})`")
-            st.write(f"Result: {len(images)} images")
-            if images:
-                st.write("First image:", images[0].get('original_filename', 'No name'))
-        
-        st.write("**Testing `get_total_user_images()`:**")
-        total = get_total_user_images(user_id)
-        st.write(f"Result: {total} total images")
-        
-        st.write("**Testing `get_session_image_folder()`:**")
-        folder = get_session_image_folder(user_id, 1)
-        st.write(f"Result: `{folder}`")
-        
-    except Exception as e:
-        st.error(f"❌ Function test failed: {e}")
-        import traceback
-        with st.expander("🔍 View Full Traceback"):
-            st.code(traceback.format_exc())
-    
-    st.divider()
-    
-    # 4. Quick Fix Button
-    st.subheader("⚡ Quick Fix")
-    
-    if st.button("🔄 RESET METADATA FILE", type="primary"):
-        try:
-            # Create backup
-            if os.path.exists(metadata_file):
-                import shutil
-                import datetime
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_file = f"{metadata_file}.backup_{timestamp}"
-                shutil.copy2(metadata_file, backup_file)
-                st.info(f"Backup created: `{backup_file}`")
-            
-            # Reset to empty valid JSON
-            with open(metadata_file, 'w') as f:
-                json.dump({}, f, indent=2)
-            
-            st.success("✅ Metadata file reset to empty valid JSON")
-            st.info("Your actual image files are safe. Only the index was reset.")
-            
-            # Auto-rerun
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"❌ Reset failed: {e}")
-    
-    if st.button("📁 CREATE ALL MISSING FOLDERS"):
-        try:
-            # Create all possible session folders
-            for i in range(1, 10):
-                folder = f"{user_folder}/session_{i}"
-                os.makedirs(folder, exist_ok=True)
-            
-            # Also create for current session
-            if 'current_session' in st.session_state and SESSIONS:
-                current_session_id = SESSIONS[st.session_state.current_session]["id"]
-                current_folder = f"{user_folder}/session_{current_session_id}"
-                os.makedirs(current_folder, exist_ok=True)
-                st.write(f"Created: `{current_folder}`")
-            
-            st.success("✅ Created all session folders")
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"❌ Failed: {e}")
-    
-    st.divider()
-    st.caption("Debug ran at: " + datetime.now().strftime("%H:%M:%S"))
 
 DEFAULT_WORD_TARGET = 500
 
@@ -716,62 +499,23 @@ Consider how these historical moments might have shaped their experiences and pe
         except Exception as e:
             print(f"Error generating historical context: {e}")
     
-    image_context = ""
-    if st.session_state.logged_in and st.session_state.user_id:
-        try:
-            current_session_id = current_session["id"]
-            image_context = get_images_for_prompt(st.session_state.user_id, current_session_id)
-        except:
-            pass
-    
-    # FIX SECTION D: Photo Story Mode section - FIXED TO BE MORE ACTIVE
-    image_prompt_section = ""
-    if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
-        image_prompt_section = "\n\n🎯 **USER HAS INITIATED PHOTO STORY MODE:**\n"
-        image_prompt_section += "The user has clicked 'Tell Photo Stories' and wants to discuss these specific images. YOU MUST ASK QUESTIONS ABOUT THESE PHOTOS NOW.\n\n"
-        
-        for idx, img in enumerate(st.session_state.selected_images_for_prompt[:5]):  # Show up to 5
-            image_prompt_section += f"**Photo {idx+1}: {img['original_filename']}**\n"
-            if img.get('description'):
-                image_prompt_section += f"Description provided by user: '{img['description']}'\n"
-            # Add a direct instruction for the AI
-            image_prompt_section += f"Ask a specific question about this photo to get the story started.\n\n"
-    
     if st.session_state.ghostwriter_mode:
         return f"""ROLE: You are a senior literary biographer with multiple award-winning books to your name.
 CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
 CURRENT TOPIC: "{current_question}"
-{historical_context}{image_context}{image_prompt_section}
+{historical_context}
 YOUR APPROACH:
 1. Listen like an archivist
 2. Think in scenes, sensory details, and emotional truth
 3. Connect personal stories to historical context when relevant
 4. Find the story that needs to be told
-5. When photos are mentioned, ask SPECIFIC questions about them
 
-PHOTO-FOCUSED QUESTIONS:
-• "Looking at this photo, what sounds/smells/feelings do you remember?"
-• "Who took this photo and why?"
-• "What happened right after this photo was taken?"
-• "How does this photo connect to your broader life story?"
-
-Tone: Literary but not pretentious. Serious but not solemn.
-IMPORTANT: When photos are mentioned, ask specific, detailed questions about them."""
+Tone: Literary but not pretentious. Serious but not solemn."""
     else:
         return f"""You are a warm, professional biographer helping document a life story.
 CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
 CURRENT TOPIC: "{current_question}"
-{historical_context}{image_context}{image_prompt_section}
-
-PHOTO-FOCUSED APPROACH:
-1. When photos are mentioned, ask about the people, place, time, and emotions
-2. Connect photos to the broader life story
-3. Ask for specific sensory details
-
-Example photo questions:
-• "Tell me about the people in this photo"
-• "What's the story behind this moment?"
-• "How do you feel when you look at this photo?"
+{historical_context}
 
 Tone: Kind, curious, professional"""
 
@@ -1576,32 +1320,6 @@ with st.sidebar:
     
     st.divider()
     
-    # FIX SECTION B: Photo Gallery - FIXED: View Photos button now works
-    st.subheader("🖼️ Photo Gallery")
-    if st.session_state.logged_in:
-        try:
-            total_images = get_total_user_images(st.session_state.user_id)
-            st.metric("Total Photos", total_images)
-            
-            # Get CURRENT session images
-            current_session_id = SESSIONS[st.session_state.current_session]["id"]
-            session_images = get_session_images(st.session_state.user_id, current_session_id)
-            
-            if session_images:
-                st.caption(f"📸 Current session: {len(session_images)} photos")
-                
-                # View Photos button
-                if st.button("👁️ View Current Photos", use_container_width=True, type="secondary"):
-                    st.session_state.show_image_gallery = True
-                    st.rerun()
-            else:
-                st.info("No photos in current session")
-                
-        except Exception as e:
-            st.info(f"Photo system: {str(e)}")
-    
-    st.divider()
-    
     # Sessions - UPDATED with traffic light system
     st.header("📖 Sessions")
     for i, session in enumerate(SESSIONS):
@@ -1654,7 +1372,7 @@ with st.sidebar:
     
     if st.session_state.ghostwriter_mode:
         st.success("✓ Professional mode active")
-        st.caption("With historical context & photo integration")
+        st.caption("With historical context")
     else:
         st.info("Standard mode active")
     
@@ -1719,14 +1437,10 @@ with st.sidebar:
     
     st.divider()
     
-    # FIX SECTION C: Export Options - FIXED: Now includes images in export
+    # Export Options
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
-    try:
-        total_images = get_total_user_images(st.session_state.user_id) if st.session_state.logged_in else 0
-        st.caption(f"Total answers: {total_answers} • Total photos: {total_images}")
-    except:
-        st.caption(f"Total answers: {total_answers}")
+    st.caption(f"Total answers: {total_answers}")
     
     if st.session_state.logged_in and st.session_state.user_id:
         export_data = {}
@@ -1740,38 +1454,14 @@ with st.sidebar:
                 }
         
         if export_data:
-            # Get ALL images for export
-            all_images_data = []
-            try:
-                # Get images from ALL sessions, not just current
-                for session in SESSIONS:
-                    session_id = session["id"]
-                    images = get_session_images(st.session_state.user_id, session_id)
-                    for img in images:
-                        # Clean export format
-                        export_img = {
-                            "id": img.get("id", ""),
-                            "session_id": session_id,
-                            "original_filename": img.get("original_filename", ""),
-                            "description": img.get("description", ""),
-                            "upload_date": img.get("upload_date", ""),
-                            "dimensions": img.get("dimensions", "")
-                        }
-                        all_images_data.append(export_img)
-            except Exception as e:
-                print(f"Error getting images for export: {e}")
-                all_images_data = []
-            
-            # Create complete export data WITH IMAGES
+            # Create complete export data
             complete_data = {
                 "user": st.session_state.user_id,
                 "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
                 "stories": export_data,
-                "images": all_images_data,  # Include all image metadata
                 "export_date": datetime.now().isoformat(),
                 "summary": {
                     "total_stories": sum(len(session['questions']) for session in export_data.values()),
-                    "total_images": len(all_images_data),
                     "total_sessions": len(export_data)
                 }
             }
@@ -1813,11 +1503,11 @@ with st.sidebar:
             st.markdown(f'''
             <a href="{publisher_url}" target="_blank">
             <button class="html-link-btn">
-            🖨️ Publish Biography (with Photos)
+            🖨️ Publish Biography
             </button>
             </a>
             ''', unsafe_allow_html=True)
-            st.caption("Create a beautiful book with your stories and photo references")
+            st.caption("Create a beautiful book with your stories")
         else:
             st.warning("No data to export yet! Start by answering some questions.")
     else:
@@ -1877,15 +1567,6 @@ with st.sidebar:
                 st.session_state.confirming_clear = "all"
                 st.rerun()
 
-# IN YOUR SIDEBAR - Replace the current debug button with:
-st.sidebar.markdown("---")
-st.sidebar.subheader("🛠️ Debug Tools")
-
-if st.sidebar.button("🔍 DEBUG IMAGE SYSTEM", key="debug_images", type="primary"):
-    # This will run the function immediately
-    debug_image_system()
-    # Don't rerun here - the function handles it
-
 # ── Main Content Area ─────────────────────────────────────────────────────────
 # Check if we have a valid current session
 if st.session_state.current_session >= len(SESSIONS):
@@ -1938,7 +1619,7 @@ with col2:
 
 # Professional Ghostwriter Mode tag
 if st.session_state.ghostwriter_mode:
-    st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode (with historical context & photo integration)</p>', unsafe_allow_html=True)
+    st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode (with historical context)</p>', unsafe_allow_html=True)
 
 # The main question
 st.markdown(f"""
@@ -1954,94 +1635,11 @@ if question_source == "regular":
     {current_session.get('guidance', '')}
     </div>
     """, unsafe_allow_html=True)
-elif st.session_state.image_prompt_mode:
-    st.info("✨ **Photo Story Mode** - The AI will ask you questions about your selected photos. Describe what you see, who's in them, and what memories they bring up!")
 else:
     if st.session_state.current_question_override.startswith("Vignette:"):
         st.info("📝 **Vignette Mode** - Write a short, focused story about a specific moment or memory.")
     else:
         st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
-
-# FIX SECTION A: Image controls - FIXED: Tell Photo Stories button now works
-st.write("")
-image_controls_container = st.container()
-with image_controls_container:
-    has_images = False
-    session_images = []
-    
-    if st.session_state.logged_in:
-        try:
-            session_images = get_session_images(st.session_state.user_id, current_session_id)
-            has_images = len(session_images) > 0
-        except Exception as e:
-            print(f"Error getting session images: {e}")
-            has_images = False
-    
-    img_col1, img_col2 = st.columns(2)
-    
-    with img_col1:
-        button_text = "📷 Add Photos" if not st.session_state.show_image_upload else "📷 Hide Photos"
-        if st.button(button_text, key="toggle_image_upload", use_container_width=True):
-            st.session_state.show_image_upload = not st.session_state.show_image_upload
-            st.rerun()
-    
-    with img_col2:
-        if has_images:
-            if st.button("✨ Tell Photo Stories", key="photo_stories_btn", use_container_width=True, type="primary"):
-                # Enable photo story mode
-                st.session_state.image_prompt_mode = True
-                st.session_state.selected_images_for_prompt = session_images
-                
-                # Force a conversation reset to trigger AI photo questions
-                if current_question_text in st.session_state.session_conversations.get(current_session_id, {}):
-                    # Clear previous conversation
-                    st.session_state.session_conversations[current_session_id][current_question_text] = []
-                
-                # Update the AI prompt to include photo information
-                st.success(f"📸 Photo Story Mode: AI will ask about your {len(session_images)} photo(s)")
-                st.rerun()
-        else:
-            st.button("✨ Tell Photo Stories", key="disabled_photo_stories", use_container_width=True, disabled=True)
-    
-    # Show image upload interface if toggled
-    if st.session_state.show_image_upload and st.session_state.logged_in:
-        st.markdown("---")
-        # FIX: Wrap in try-except to prevent interface error after upload
-        try:
-            # This function might fail after a rerun due to uploader state
-            image_upload_interface(st.session_state.user_id, current_session_id)
-        except Exception as e:
-            # If it fails, just don't show the interface; images were already uploaded
-            pass  # Silent fail is acceptable here
-        
-        # Show existing images
-        try:
-            if has_images:
-                st.subheader("📸 Your Photos for This Session")
-                selected_images = display_image_gallery(
-                    st.session_state.user_id, 
-                    current_session_id, 
-                    columns=2
-                )
-                if selected_images:
-                    st.session_state.selected_images_for_prompt = selected_images
-                    st.success(f"✅ Selected {len(selected_images)} photo(s) for storytelling!")
-        except Exception as e:
-            st.info("No photos uploaded for this session yet.")
-    
-    st.markdown("---")
-    
-    # Historical context message
-    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
-        try:
-            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
-            events = get_events_for_birth_year(birth_year)
-            if events and st.session_state.ghostwriter_mode:
-                uk_count = len([e for e in events if e.get('region') == 'UK'])
-                global_count = len(events) - uk_count
-                st.info(f"📜 **Historical Context Enabled:** Your responses will be enriched with {len(events)} historical events ({uk_count} UK, {global_count} global) from your lifetime.")
-        except:
-            pass
 
 # Conversation area
 if current_session_id not in st.session_state.session_conversations:
@@ -2065,11 +1663,7 @@ if not conversation:
             <div style='font-size: 1.8rem; font-weight: bold; color: #2c3e50; line-height: 1.3;'>
             {current_question_text}
             </div>"""
-            if st.session_state.image_prompt_mode:
-                welcome_msg += f"""<div style='font-size: 1.1rem; margin-top: 1.5rem; color: #4CAF50; background-color: #e8f5e9; padding: 1rem; border-radius: 8px; border-left: 4px solid #4CAF50;'>
-                📸 <strong>Photo Story Mode:</strong> You've selected {len(st.session_state.selected_images_for_prompt)} photo(s) to write about. I'll ask you questions about each photo to help tell their stories.
-                </div>"""
-            elif question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
+            if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
                 welcome_msg += f"""<div style='font-size: 1.1rem; margin-top: 1.5rem; color: #9b59b6; background-color: #f4ecf7; padding: 1rem; border-radius: 8px; border-left: 4px solid #9b59b6;'>
                 📝 <strong>Vignette Mode:</strong> Write a short, focused story about this specific moment or memory.
                 </div>"""
@@ -2083,9 +1677,7 @@ if not conversation:
                 </div>"""
             st.markdown(welcome_msg, unsafe_allow_html=True)
         conv_text = f"Let's explore this topic in detail: {current_question_text}\n\n"
-        if st.session_state.image_prompt_mode:
-            conv_text += f"📸 Photo Story Mode: You've selected {len(st.session_state.selected_images_for_prompt)} photo(s) to write about. I'll ask you questions about each photo to help tell their stories."
-        elif question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
+        if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
             conv_text += "📝 Vignette Mode: Write a short, focused story about this specific moment or memory."
         elif question_source == "custom":
             conv_text += "✨ Custom Topic: Write about whatever comes to mind!"
@@ -2152,24 +1744,13 @@ user_input = st.text_area(
 
 col1, col2 = st.columns([1, 3])
 with col1:
-    # FIX SECTION E: Fix Save Answer to Include Image Context
     if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
         if user_input:
             if st.session_state.spellcheck_enabled:
                 user_input = auto_correct_text(user_input)
             conversation.append({"role": "user", "content": user_input})
             
-            # ADD THIS: Include image context when saving
-            image_context = ""
-            if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
-                image_context = "\n\n[USER IS DISCUSSING THESE PHOTOS:]\n"
-                for img in st.session_state.selected_images_for_prompt:
-                    image_context += f"- {img['original_filename']}"
-                    if img.get('description'):
-                        image_context += f" ({img['description']})"
-                    image_context += "\n"
-            
-            save_response(current_session_id, current_question_text, user_input + image_context)
+            save_response(current_session_id, current_question_text, user_input)
             
             with st.chat_message("assistant", avatar="👔"):
                 with st.spinner("Reflecting on your story..."):
@@ -2189,9 +1770,7 @@ with col1:
                             max_tokens=max_tokens
                         )
                         ai_response = response.choices[0].message.content
-                        if st.session_state.image_prompt_mode:
-                            ai_response += f"\n\n📸 **Photo Note:** Keep describing your photos! Who, what, where, when, and why?"
-                        elif question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
+                        if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
                             ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
                         st.markdown(ai_response)
                         conversation.append({"role": "assistant", "content": ai_response})
@@ -2291,12 +1870,7 @@ with col3:
     total_all_topics = sum(len(s["questions"]) for s in SESSIONS)
     st.metric("Topics Explored", f"{total_topics_answered}/{total_all_topics}")
 with col4:
-    if st.session_state.logged_in:
-        try:
-            total_images = get_total_user_images(st.session_state.user_id)
-            st.metric("Total Photos", f"{total_images}")
-        except:
-            st.metric("Total Photos", "0")
+    st.metric("Total Stories", f"{total_topics_answered}")
 
 # ============================================================================
 # SECTION: BIOGRAPHY FORMATTER EXPORT (FROM ORIGINAL WORKING APP)
@@ -2322,7 +1896,7 @@ if current_user and current_user != "" and export_data:
     # Count total stories (matching original app logic)
     total_stories = sum(len(session['questions']) for session in export_data.values())
     
-    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP WITH IMAGES
+    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP
     json_data = json.dumps({
         "user": current_user,
         "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
@@ -2396,14 +1970,9 @@ st.markdown("---")
 if st.session_state.user_account:
     profile = st.session_state.user_account['profile']
     account_age = (datetime.now() - datetime.fromisoformat(st.session_state.user_account['created_at'])).days
-    try:
-        total_images = get_total_user_images(st.session_state.user_id) if st.session_state.logged_in else 0
-    except:
-        total_images = 0
     
     footer_info = f"""
-Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} • 🔥 {st.session_state.streak_days} day streak •
-📷 {total_images} photos • 📅 Account Age: {account_age} days
+Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} • 🔥 {st.session_state.streak_days} day streak • 📅 Account Age: {account_age} days
 """
     st.caption(footer_info)
 else:
