@@ -45,6 +45,73 @@ except ImportError as e:
     VignetteManager = None
     # Image functions will use fallbacks
 
+# ============================================================================
+# DEBUG FUNCTION - Add this right after imports
+# ============================================================================
+def debug_image_system():
+    """Debug the image system - call this from sidebar"""
+    import os
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🛠️ Debug Image System")
+    
+    # Get user ID
+    user_id = st.session_state.get('user_id', 'not_logged_in')
+    st.sidebar.write(f"**User ID:** `{user_id}`")
+    
+    # Check user_images folder
+    base_folder = "user_images"
+    user_folder = f"{base_folder}/{user_id}"
+    
+    # Create folders if they don't exist
+    os.makedirs(user_folder, exist_ok=True)
+    
+    st.sidebar.write(f"**Created folder:** `{user_folder}`")
+    
+    # Check metadata file
+    metadata_file = f"{user_folder}/image_metadata.json"
+    if os.path.exists(metadata_file):
+        try:
+            with open(metadata_file, 'r') as f:
+                import json
+                data = json.load(f)
+                session_count = len(data)
+                total_images = sum(len(images) for images in data.values())
+                st.sidebar.success(f"✅ Metadata: {session_count} sessions, {total_images} images")
+                
+                # Show session data
+                for session_id, images in data.items():
+                    st.sidebar.write(f"• Session {session_id}: {len(images)} images")
+        except Exception as e:
+            st.sidebar.error(f"❌ Corrupted: {str(e)}")
+            
+            # Fix it
+            with open(metadata_file, 'w') as f:
+                json.dump({}, f)
+            st.sidebar.info("Fixed: Reset to empty JSON")
+    else:
+        st.sidebar.info("No metadata file yet")
+        # Create empty file
+        with open(metadata_file, 'w') as f:
+            import json
+            json.dump({}, f)
+        st.sidebar.success("Created empty metadata file")
+    
+    # List all files in user folder
+    try:
+        files = os.listdir(user_folder)
+        st.sidebar.write(f"**Files in folder:** {len(files)}")
+        for file in files:
+            filepath = f"{user_folder}/{file}"
+            size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
+            st.sidebar.write(f"• `{file}` ({size} bytes)")
+    except Exception as e:
+        st.sidebar.error(f"Cannot list files: {e}")
+    
+    # Force rerun to refresh
+    if st.sidebar.button("🔄 Refresh & Rerun", key="debug_rerun"):
+        st.rerun()
+
 DEFAULT_WORD_TARGET = 500
 
 # ── OpenAI client ─────────────────────────────────────────────────────────────
