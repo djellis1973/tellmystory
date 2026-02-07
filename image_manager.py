@@ -1,5 +1,5 @@
 """
-Image Manager Module for MemLife Biographer
+Image Manager Module for TellMyStory Biographer
 Handles image uploads, storage, and integration with stories
 """
 
@@ -260,7 +260,7 @@ def display_image_gallery(user_id, session_id, columns=3):
     return selected_images
 
 def image_upload_interface(user_id, session_id):
-    """Streamlit interface for uploading images"""
+    """Streamlit interface for uploading images - FIXED SIZE"""
     with st.expander("📤 Upload Images to This Session", expanded=False):
         st.write("Add photos that relate to this session's memories.")
         
@@ -277,28 +277,31 @@ def image_upload_interface(user_id, session_id):
             description = st.text_area(
                 "Add a description for these images (optional):",
                 placeholder="E.g., 'Family vacation in Cornwall, 1985'",
-                key=f"img_desc_{session_id}"
+                key=f"img_desc_{session_id}",
+                height=80  # FIXED: Reduced height
             )
             
             # Upload button
-            if st.button("Upload Images", key=f"upload_btn_{session_id}", type="primary"):
-                success_count = 0
-                error_count = 0
-                
-                for uploaded_file in uploaded_files:
-                    result = save_uploaded_image(uploaded_file, user_id, session_id, description)
-                    if result["success"]:
-                        success_count += 1
-                    else:
-                        error_count += 1
-                        st.error(f"Error uploading {uploaded_file.name}: {result['error']}")
-                
-                if success_count > 0:
-                    st.success(f"Successfully uploaded {success_count} image(s)!")
-                    st.rerun()
-                
-                if error_count > 0:
-                    st.warning(f"Failed to upload {error_count} image(s).")
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                if st.button("Upload Images", key=f"upload_btn_{session_id}", type="primary"):
+                    success_count = 0
+                    error_count = 0
+                    
+                    for uploaded_file in uploaded_files:
+                        result = save_uploaded_image(uploaded_file, user_id, session_id, description)
+                        if result["success"]:
+                            success_count += 1
+                        else:
+                            error_count += 1
+                            st.error(f"Error uploading {uploaded_file.name}: {result['error']}")
+                    
+                    if success_count > 0:
+                        st.success(f"Successfully uploaded {success_count} image(s)!")
+                        st.rerun()
+                    
+                    if error_count > 0:
+                        st.warning(f"Failed to upload {error_count} image(s).")
 
 def get_images_for_prompt(user_id, session_id):
     """Get images formatted for AI prompt"""
