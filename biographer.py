@@ -1507,24 +1507,8 @@ with st.sidebar:
         profile = st.session_state.user_account['profile']
         st.success(f"✓ **{profile['first_name']} {profile['last_name']}**")
         
-        # ONLY show these - no email
-        if profile.get('birthdate'):
-            st.caption(f"🎂 Born: {profile['birthdate']}")
-        
-        # Historical events with green checkmark
-        if profile.get('birthdate'):
-            try:
-                birth_year = int(profile['birthdate'].split(', ')[-1])
-                events = get_events_for_birth_year(birth_year)
-                if events:
-                    uk_events = [e for e in events if e.get('region') == 'UK']
-                    global_events = len(events) - len(uk_events)
-                    st.success(f"✓ {len(events)} historical events ({len(uk_events)} UK, {global_events} global)")
-            except:
-                pass
-        
+        # CRITICAL SECTION 2: REMOVED birthdate and historical events display
         account_type = st.session_state.user_account['account_type']
-        st.caption(f"👤 Account: {account_type.title()}")
     
     # Full width buttons
     if st.button("📝 Edit Profile", use_container_width=True):
@@ -1971,68 +1955,35 @@ else:
     else:
         st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
 
-# FIX SECTION A: Image controls - FIXED: Tell Photo Stories button now works
+# CRITICAL SECTION 1: Image Upload Section - SIMPLIFIED (No AI Photo Stories)
 st.write("")
 image_controls_container = st.container()
 with image_controls_container:
-    has_images = False
-    session_images = []
-    
-    if st.session_state.logged_in:
-        try:
-            session_images = get_session_images(st.session_state.user_id, current_session_id)
-            has_images = len(session_images) > 0
-        except Exception as e:
-            print(f"Error getting session images: {e}")
-            has_images = False
-    
-    img_col1, img_col2 = st.columns(2)
-    
-    with img_col1:
-        button_text = "📷 Add Photos" if not st.session_state.show_image_upload else "📷 Hide Photos"
-        if st.button(button_text, key="toggle_image_upload", use_container_width=True):
-            st.session_state.show_image_upload = not st.session_state.show_image_upload
-            st.rerun()
-    
-    with img_col2:
-        if has_images:
-            if st.button("✨ Tell Photo Stories", key="photo_stories_btn", use_container_width=True, type="primary"):
-                # ENABLE PHOTO MODE
-                st.session_state.image_prompt_mode = True
-                st.session_state.selected_images_for_prompt = session_images
-                
-                # FORCE NEW CONVERSATION ABOUT PHOTOS
-                if current_question_text in st.session_state.session_conversations.get(current_session_id, {}):
-                    st.session_state.session_conversations[current_session_id][current_question_text] = []
-                
-                st.success(f"📸 Photo Story Mode: Ready to discuss {len(session_images)} photo(s)!")
-                st.rerun()
-        else:
-            st.button("✨ Tell Photo Stories", key="disabled_photo_stories", use_container_width=True, disabled=True)
+    # Just the Add Photos button - NO AI STORIES
+    button_text = "📷 Add Photos" if not st.session_state.show_image_upload else "📷 Hide Photos"
+    if st.button(button_text, key="toggle_image_upload", use_container_width=True):
+        st.session_state.show_image_upload = not st.session_state.show_image_upload
+        st.rerun()
     
     # Show image upload interface if toggled
     if st.session_state.show_image_upload and st.session_state.logged_in:
         st.markdown("---")
-        # FIX: Wrap in try-except to prevent interface error after upload
+        # This function now handles ONE image at a time with description
         try:
-            # This function might fail after a rerun due to uploader state
             image_upload_interface(st.session_state.user_id, current_session_id)
         except Exception as e:
-            # If it fails, just don't show the interface; images were already uploaded
             pass  # Silent fail is acceptable here
         
-        # Show existing images
+        # Show existing images gallery
         try:
-            if has_images:
+            session_images = get_session_images(st.session_state.user_id, current_session_id)
+            if session_images:
                 st.subheader("📸 Your Photos for This Session")
                 selected_images = display_image_gallery(
                     st.session_state.user_id, 
                     current_session_id, 
                     columns=2
                 )
-                if selected_images:
-                    st.session_state.selected_images_for_prompt = selected_images
-                    st.success(f"✅ Selected {len(selected_images)} photo(s) for storytelling!")
         except Exception as e:
             st.info("No photos uploaded for this session yet.")
     
@@ -2130,6 +2081,7 @@ for i, message in enumerate(conversation):
                             save_response(current_session_id, current_question_text, new_text)
                             st.session_state.editing = None
                             st.rerun()
+
                     with col2:
                         if st.button("✕ Cancel", key=f"cancel_{current_session_id}_{hash(current_question_text)}_{i}"):
                             st.session_state.editing = None
@@ -2159,24 +2111,15 @@ user_input = st.text_area(
 
 col1, col2 = st.columns([1, 3])
 with col1:
-    # FIX SECTION E: Fix Save Answer to Include Image Context
+    # CRITICAL SECTION 3: Save Answer button - SIMPLIFIED (No image context in answer)
     if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
         if user_input:
             if st.session_state.spellcheck_enabled:
                 user_input = auto_correct_text(user_input)
             conversation.append({"role": "user", "content": user_input})
             
-            # ADD THIS: Include image context when saving
-            image_context = ""
-            if st.session_state.image_prompt_mode and st.session_state.selected_images_for_prompt:
-                image_context = "\n\n[USER IS DISCUSSING THESE PHOTOS:]\n"
-                for img in st.session_state.selected_images_for_prompt:
-                    image_context += f"- {img['original_filename']}"
-                    if img.get('description'):
-                        image_context += f" ({img['description']})"
-                    image_context += "\n"
-            
-            save_response(current_session_id, current_question_text, user_input + image_context)
+            # SAVE THE ANSWER (NO IMAGE CONTEXT ADDED)
+            save_response(current_session_id, current_question_text, user_input)
             
             with st.chat_message("assistant", avatar="👔"):
                 with st.spinner("Reflecting on your story..."):
@@ -2196,10 +2139,6 @@ with col1:
                             max_tokens=max_tokens
                         )
                         ai_response = response.choices[0].message.content
-                        if st.session_state.image_prompt_mode:
-                            ai_response += f"\n\n📸 **Photo Note:** Keep describing your photos! Who, what, where, when, and why?"
-                        elif question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
-                            ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
                         st.markdown(ai_response)
                         conversation.append({"role": "assistant", "content": ai_response})
                     except Exception as e:
