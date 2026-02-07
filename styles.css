@@ -1,4 +1,4 @@
-/* styles.css - Tell My Story styling (COMPLETE) */
+/* styles.css - MemLife styling */
 
 /* ============================================================================
    General Layout & Typography
@@ -6,13 +6,13 @@
 .main-header {
     text-align: center;
     padding-top: 0.5rem;
-    margin-top: -2rem;
-    margin-bottom: 1rem;
+    margin-top: -1rem;
+    margin-bottom: 0.5rem;
 }
 
 .logo-img {
-    width: 120px;
-    height: 120px;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     object-fit: cover;
     margin: 0 auto 0.25rem auto;
@@ -28,7 +28,7 @@
 }
 
 /* ============================================================================
-   Guidance / Question / Box styles - BLUE/GREEN THEME
+   Guidance / Question / Box styles
    ============================================================================ */
 .chapter-guidance {
     background-color: #e8f4f8;
@@ -41,10 +41,10 @@
 }
 
 .question-box {
-    background-color: #e8f4f8;
+    background-color: #f8f9fa;
     padding: 1.5rem;
     border-radius: 10px;
-    border-left: 5px solid #27ae60;
+    border-left: 5px solid #4a5568;
     margin-bottom: 0.5rem;
     font-size: 1.3rem;
     font-weight: 600;
@@ -59,22 +59,22 @@
 }
 
 .jot-box {
-    background-color: #e8f4f8;
+    background-color: #fff8e1;
     padding: 1rem;
     border-radius: 8px;
-    border-left: 4px solid #3498db;
+    border-left: 4px solid #ffb300;
     margin-bottom: 1rem;
     font-size: 0.9rem;
 }
 
 /* ============================================================================
-   Progress & Status - BLUE/GREEN THEME
+   Progress & Status
    ============================================================================ */
 .progress-container {
-    background-color: #e8f4f8;
+    background-color: #f8f9fa;
     padding: 1.5rem;
     border-radius: 10px;
-    border: 2px solid #3498db;
+    border: 2px solid #e0e0e0;
     margin: 1rem 0;
 }
 
@@ -121,11 +121,11 @@
 }
 
 .edit-target-box {
-    background-color: #e8f4f8;
+    background-color: #f8f9fa;
     padding: 1rem;
     border-radius: 8px;
     margin: 0.5rem 0;
-    border: 1px solid #3498db;
+    border: 1px solid #dee2e6;
 }
 
 .warning-box {
@@ -137,14 +137,10 @@
 }
 
 .ghostwriter-tag {
-    font-size: 0.9rem;
-    color: #3498db;
-    font-weight: 500;
-    margin-top: 0.25rem;
-    padding: 0.5rem;
-    background-color: #e8f4f8;
-    border-radius: 4px;
-    display: inline-block;
+    font-size: 0.8rem;
+    color: #666;
+    font-style: italic;
+    margin-top: 0.5rem;
 }
 
 /* ============================================================================
@@ -162,66 +158,37 @@
 }
 
 /* ============================================================================
-   BUTTONS - ALL BLUE/GREEN THEME (NO REDS)
+   Buttons
    ============================================================================ */
-/* Primary buttons - BLUE */
-.stButton > button:first-child {
-    background-color: #3498db !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 6px !important;
+.refresh-prompt-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s;
 }
 
-.stButton > button:first-child:hover {
-    background-color: #2980b9 !important;
+.refresh-prompt-btn:hover {
+    transform: scale(1.05);
 }
 
-/* Secondary buttons - GREEN */
-.stButton > button[kind="secondary"] {
-    background-color: #27ae60 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 6px !important;
-}
-
-.stButton > button[kind="secondary"]:hover {
-    background-color: #219653 !important;
-}
-
-/* Disabled buttons */
-.stButton > button:disabled {
-    background-color: #bdc3c7 !important;
-    color: #7f8c8d !important;
-}
-
-/* Save Answer button - GREEN */
-button[data-testid="baseButton-secondary"]:has(div:contains("Save Answer")),
-button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")) {
-    background-color: #27ae60 !important;
-    color: white !important;
-    border: none !important;
-}
-
-button[data-testid="baseButton-secondary"]:has(div:contains("Save Answer")):hover,
-button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")):hover {
-    background-color: #219653 !important;
-}
-
-/* Image buttons - GREEN */
 .simple-image-btn {
-    background: #27ae60 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 6px !important;
-    padding: 0.5rem 1rem !important;
-    font-weight: bold !important;
-    cursor: pointer !important;
-    margin: 0.25rem !important;
-    width: 100% !important;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 0.25rem;
+    width: 100%;
 }
 
 .simple-image-btn:hover {
-    background: #219653 !important;
+    background: #45a049;
 }
 
 /* ============================================================================
@@ -310,7 +277,7 @@ button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")):hover 
 .auth-button {
     width: 100%;
     padding: 0.875rem;
-    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
     border-radius: 8px;
@@ -323,7 +290,7 @@ button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")):hover 
 
 .auth-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
 .auth-divider {
@@ -373,7 +340,7 @@ button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")):hover 
    Photo / Gallery related
    ============================================================================ */
 .photo-prompt-card {
-    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     padding: 1rem;
     border-radius: 10px;
@@ -384,11 +351,11 @@ button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")):hover 
 
 .photo-prompt-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
 .html-link-btn {
-    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white !important;
     border: none;
     padding: 0.75rem 1.5rem;
@@ -405,10 +372,7 @@ button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")):hover 
 .html-link-btn:hover {
     opacity: 0.9;
 }
-
-/* ============================================================================
-   Success Messages
-   ============================================================================ */
+/* Add this to your styles.css file - Success Messages */
 .success-message-fixed {
     position: fixed;
     top: 20px;
@@ -453,184 +417,8 @@ button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")):hover 
 
 /* Custom session indicator */
 .custom-session-indicator {
-    color: #3498db;
+    color: #ff6b00;
     font-weight: bold;
     display: inline-block;
     margin-left: 5px;
 }
-
-/* ============================================================================
-   SIDEBAR SPECIFIC STYLES - ALL YOUR REQUESTED CHANGES
-   ============================================================================ */
-
-/* Make ALL sidebar buttons full width and stacked vertically */
-section[data-testid="stSidebar"] .stButton > button {
-    width: 100% !important;
-    margin: 0.25rem 0 !important;
-    display: block !important;
-    min-height: 40px !important;
-}
-
-/* Sidebar sections spacing */
-section[data-testid="stSidebar"] .element-container {
-    margin-bottom: 0.75rem !important;
-}
-
-/* Sidebar headers */
-section[data-testid="stSidebar"] h1,
-section[data-testid="stSidebar"] h2,
-section[data-testid="stSidebar"] h3 {
-    margin-top: 1rem !important;
-    margin-bottom: 0.5rem !important;
-}
-
-/* Sidebar button colors - ALL BLUE */
-section[data-testid="stSidebar"] .stButton > button {
-    background-color: #3498db !important;
-    color: white !important;
-    border: none !important;
-}
-
-section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #2980b9 !important;
-}
-
-/* Success checkmarks in sidebar - GREEN */
-section[data-testid="stSidebar"] .stSuccess {
-    background-color: #d4edda !important;
-    border-left: 4px solid #27ae60 !important;
-    padding: 0.75rem !important;
-    margin: 0.5rem 0 !important;
-    border-radius: 6px !important;
-    color: #155724 !important;
-    font-weight: 500 !important;
-}
-
-/* Historical events success message */
-section[data-testid="stSidebar"] div:contains("historical events loaded") {
-    background-color: #d4edda !important;
-    border-color: #27ae60 !important;
-    color: #155724 !important;
-    border-radius: 6px !important;
-    padding: 0.5rem !important;
-}
-
-/* Profile info styling - no email */
-section[data-testid="stSidebar"] .stAlert {
-    background-color: #e8f4f8 !important;
-    border: 1px solid #3498db !important;
-}
-
-/* Hide email from profile */
-section[data-testid="stSidebar"] .stCaption:contains("@"),
-section[data-testid="stSidebar"] div:contains("@") {
-    display: none !important;
-}
-
-/* Remove these sections completely */
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(div:contains("Session Navigation")),
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(div:contains("Topic Navigation")),
-section[data-testid="stSidebar"] div:has(h2:contains("Topic Browser")),
-section[data-testid="stSidebar"] div:has(h1:contains("Topic Browser")) {
-    display: none !important;
-}
-
-/* Big text area for long-form answers */
-.stTextArea textarea {
-    min-height: 200px !important;
-    font-size: 16px !important;
-    line-height: 1.6 !important;
-    padding: 1rem !important;
-    border: 2px solid #3498db !important;
-    border-radius: 8px !important;
-}
-
-.stTextArea textarea:focus {
-    border-color: #27ae60 !important;
-    box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.1) !important;
-}
-
-/* Make the "Save Answer" button prominent and green */
-button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")),
-button[data-testid="baseButton-secondary"]:has(div:contains("Save Answer")) {
-    background-color: #27ae60 !important;
-    color: white !important;
-    font-weight: bold !important;
-    font-size: 1.1rem !important;
-    padding: 0.75rem 1.5rem !important;
-    height: auto !important;
-    border: none !important;
-    border-radius: 8px !important;
-}
-
-button[data-testid="baseButton-primary"]:has(div:contains("Save Answer")):hover,
-button[data-testid="baseButton-secondary"]:has(div:contains("Save Answer")):hover {
-    background-color: #219653 !important;
-}
-
-/* Historical context info box - GREEN */
-.stInfo {
-    background-color: #d4edda !important;
-    border-color: #27ae60 !important;
-    color: #155724 !important;
-    border-radius: 8px !important;
-    border-left: 4px solid #27ae60 !important;
-}
-
-.stInfo a {
-    color: #27ae60 !important;
-    font-weight: bold !important;
-}
-
-/* Session progress colors - Traffic light system */
-.session-red { color: #e74c3c !important; font-weight: bold; }
-.session-yellow { color: #f39c12 !important; font-weight: bold; }
-.session-green { color: #27ae60 !important; font-weight: bold; }
-.session-current { color: #3498db !important; font-weight: bold; }
-
-/* Progress bar color override for blue/green theme */
-div[data-testid="stProgress"] > div > div > div {
-    background-color: #27ae60 !important;
-}
-
-/* Navigation buttons styling */
-button:has(div:contains("Previous Topic")),
-button:has(div:contains("Next Topic")) {
-    background-color: #3498db !important;
-    color: white !important;
-}
-
-button:has(div:contains("Previous Topic")):disabled,
-button:has(div:contains("Next Topic")):disabled {
-    background-color: #bdc3c7 !important;
-    color: #7f8c8d !important;
-}
-
-/* Modal overlays */
-.modal-overlay {
-    background: white;
-    padding: 2rem;
-    border-radius: 10px;
-    margin: 1rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    position: relative;
-    z-index: 1000;
-}
-
-/* Metrics styling */
-section[data-testid="stSidebar"] [data-testid="stMetric"] {
-    background-color: #e8f4f8 !important;
-    padding: 0.75rem !important;
-    border-radius: 8px !important;
-    border: 1px solid #3498db !important;
-}
-
-/* Divider styling */
-section[data-testid="stSidebar"] hr {
-    margin: 1.5rem 0 !important;
-    border-color: #e0e0e0 !important;
-}
-
-/* Expandable sections */
-section[data-testid="stSidebar"] [data-testid="stExpander"] {
-    border: 1px solid #3498db !important;
