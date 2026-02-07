@@ -12,6 +12,7 @@ import uuid
 from PIL import Image
 import io
 import base64
+import time
 
 # Image configuration
 IMAGE_CONFIG = {
@@ -177,7 +178,7 @@ def save_uploaded_image(uploaded_file, user_id, session_id, description=""):
         return {
             "success": True,
             "image_info": image_info,
-            "message": f"Image '{original_filename}' uploaded successfully!"
+            "message": f"Image uploaded successfully!"
         }
         
     except Exception as e:
@@ -286,51 +287,45 @@ def display_image_gallery(user_id, session_id, columns=3):
     return selected_images
 
 def image_upload_interface(user_id, session_id):
-    """Streamlit interface for uploading images - FIXED SIZE"""
+    """Streamlit interface for uploading images - ONE AT A TIME WITH DESCRIPTION"""
     with st.expander("📤 Upload Images to This Session", expanded=False):
-        st.write("Add photos that relate to this session's memories.")
+        st.write("Add photos one at a time. Write about each photo as you upload it.")
         
-        # File uploader
-        uploaded_files = st.file_uploader(
-            "Choose images",
+        # SINGLE file uploader - ONE AT A TIME
+        uploaded_file = st.file_uploader(
+            "Choose an image",
             type=IMAGE_CONFIG["allowed_formats"],
-            accept_multiple_files=True,
-            key=f"image_uploader_{session_id}"
+            accept_multiple_files=False,
+            key=f"image_uploader_{session_id}_{int(time.time())}"  # Unique key
         )
         
-        if uploaded_files:
-            # Description input
+        if uploaded_file:
+            # Individual description for this ONE image
             description = st.text_area(
-                "Add a description for these images (optional):",
-                placeholder="E.g., 'Family vacation in Cornwall, 1985'",
-                key=f"img_desc_{session_id}",
-                height=80  # FIXED: Reduced height
+                "✍️ Write about this image:",
+                placeholder="Tell the story behind this photo. Who's in it? When was it taken? What memories does it bring back?",
+                key=f"img_desc_{session_id}_{uploaded_file.name}",
+                height=100
             )
             
             # Upload button
             col1, col2 = st.columns([1, 3])
             with col1:
-                if st.button("Upload Images", key=f"upload_btn_{session_id}", type="primary"):
-                    success_count = 0
-                    error_count = 0
-                    
-                    for uploaded_file in uploaded_files:
-                        result = save_uploaded_image(uploaded_file, user_id, session_id, description)
-                        if result["success"]:
-                            success_count += 1
-                        else:
-                            error_count += 1
-                            st.error(f"Error uploading {uploaded_file.name}: {result['error']}")
-                    
-                    if success_count > 0:
-                        st.success(f"Successfully uploaded {success_count} image(s)!")
+                if st.button("📤 Upload This Image", key=f"upload_btn_{session_id}", type="primary"):
+                    result = save_uploaded_image(uploaded_file, user_id, session_id, description)
+                    if result["success"]:
+                        st.success("✅ Image uploaded successfully!")
+                        st.info("📝 Your story about this image has been saved.")
                         st.rerun()
-                    
-                    if error_count > 0:
-                        st.warning(f"Failed to upload {error_count} image(s).")
+                    else:
+                        st.error(f"❌ Error: {result['error']}")
+            
+            with col2:
+                if st.button("🔄 Upload Another", key=f"another_btn_{session_id}"):
+                    st.rerun()
 
 def get_images_for_prompt(user_id, session_id):
-    """Get images formatted for AI prompt"""
+    """Get images formatted for AI prompt - SIMPLIFIED"""
     images = get_session_images(user_id, session_id)
     
     if not images:
@@ -343,8 +338,6 @@ def get_images_for_prompt(user_id, session_id):
         if img.get('description'):
             prompt_text += f" - {img['description']}"
         prompt_text += "\n"
-    
-    prompt_text += "\n**When relevant, ask about these photos.**\n"
     
     return prompt_text
 
