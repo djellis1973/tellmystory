@@ -902,11 +902,58 @@ def show_session_manager():
 
 # ── Page Config & State ───────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="MemLife - Your Life Timeline",
+    page_title="",  # Empty title
     page_icon="📖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
+
+# Dynamic sidebar hiding based on login state
+if not st.session_state.logged_in:
+    # Hide everything when not logged in
+    st.markdown("""
+    <style>
+        /* Hide the main title */
+        .st-emotion-cache-10trblm {
+            display: none !important;
+        }
+        
+        /* Hide the header */
+        header[data-testid="stHeader"] {
+            display: none !important;
+        }
+        
+        /* Hide sidebar completely */
+        section[data-testid="stSidebar"] {
+            display: none !important;
+        }
+        
+        /* Hide sidebar toggle button */
+        .st-emotion-cache-h5rg2q {
+            display: none !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    # Show sidebar when logged in
+    st.markdown("""
+    <style>
+        /* Still hide the page title */
+        .st-emotion-cache-10trblm {
+            display: none !important;
+        }
+        
+        /* Show sidebar */
+        section[data-testid="stSidebar"] {
+            display: block !important;
+        }
+        
+        /* Show sidebar toggle */
+        .st-emotion-cache-h5rg2q {
+            display: block !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
 default_state = {
     "logged_in": False,
