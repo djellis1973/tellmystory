@@ -1773,9 +1773,13 @@ for i, message in enumerate(conversation):
 # BIG ANSWER BOX with SAVE button (not arrow)
 st.write("")
 st.write("")
+
+# Create a unique key for the text area that includes the current question
+text_area_key = f"long_form_answer_{current_session_id}_{hash(current_question_text)}"
+
 user_input = st.text_area(
     "Type your long-form answer here...",
-    key="long_form_answer",
+    key=text_area_key,
     height=200,
     placeholder="Write your detailed response here. This is where you should write your full story...",
     label_visibility="visible"
@@ -1785,14 +1789,18 @@ col1, col2 = st.columns([1, 3])
 with col1:
     if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
         if user_input:
+            # Apply spellcheck if enabled
             if st.session_state.spellcheck_enabled:
-                user_input = auto_correct_text(user_input)
+                corrected_text = auto_correct_text(user_input)
+                # Update the session state with corrected text so it shows in the text area
+                st.session_state[text_area_key] = corrected_text
+                user_input = corrected_text  # Use corrected text for saving
+            
+            # Add user message to conversation
             conversation.append({"role": "user", "content": user_input})
             
+            # Save the response
             save_response(current_session_id, current_question_text, user_input)
-            
-            # Clear the text area after saving
-            st.session_state.long_form_answer = ""
             
             # Generate AI response
             with st.spinner("Reflecting on your story..."):
@@ -1832,6 +1840,10 @@ with col1:
                     conversation.append({"role": "assistant", "content": error_msg})
                     st.session_state.session_conversations[current_session_id][current_question_text] = conversation
                     print(f"Error generating AI response: {e}")
+            
+            # Clear the text area by removing its session state
+            if text_area_key in st.session_state:
+                del st.session_state[text_area_key]
             
             st.rerun()
         else:
