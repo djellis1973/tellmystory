@@ -1215,8 +1215,29 @@ if st.session_state.get('show_profile_setup', False):
     st.stop()
 
 if not st.session_state.logged_in:
+    # Hide sidebar completely on login page
+    hide_sidebar_css = """
+    <style>
+        section[data-testid="stSidebar"] {
+            display: none !important;
+        }
+        .st-emotion-cache-6qob1r {
+            display: none !important;
+        }
+    </style>
+    """
+    st.markdown(hide_sidebar_css, unsafe_allow_html=True)
     show_login_signup()
     st.stop()
+
+# ONLY show sidebar after user is logged in
+st.markdown("""
+<style>
+    section[data-testid="stSidebar"] {
+        display: block !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 if not st.session_state.historical_events_loaded:
     try:
