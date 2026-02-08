@@ -902,7 +902,7 @@ def show_session_manager():
 
 # ── Page Config & State ───────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Tell My Story - Your Life Timeline",
+    page_title="",  # Empty string removes the title
     page_icon="📖",
     layout="wide",
     initial_sidebar_state="expanded"
