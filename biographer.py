@@ -19,7 +19,15 @@ import sys
 # Add current directory to path to import modules
 sys.path.append('.')
 
-# Import ALL modules
+# ── PAGE CONFIG MUST BE FIRST ────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Tell My Story",  # Give it a real title
+    page_icon="📖",
+    layout="wide",
+    initial_sidebar_state="expanded"  # Like the working version
+)
+
+# Now import modules (AFTER page config)
 try:
     from topic_bank import TopicBank
     from session_manager import SessionManager
@@ -27,12 +35,12 @@ try:
 except ImportError as e:
     st.error(f"Error importing modules: {e}")
     st.info("Please ensure all .py files are in the same directory")
-    # Set to None if import fails
     TopicBank = None
     SessionManager = None
     VignetteManager = None
 
 DEFAULT_WORD_TARGET = 500
+
 
 # ── OpenAI client ─────────────────────────────────────────────────────────────
 client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY")))
