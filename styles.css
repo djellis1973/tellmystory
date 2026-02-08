@@ -1,30 +1,53 @@
 /* ============================================================================
-   RESET & BASE STYLES
+   HIDE STREAMLIT DEFAULT LINKS (CRITICAL FIX)
    ============================================================================ */
 
-/* Hide Streamlit's default sharing links */
-.css-1y4p8pa a {
-    color: transparent !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    visibility: hidden !important;
-}
-
-/* Alternative approach - hide the entire container */
-.css-1y4p8pa {
-    display: none !important;
-}
-
-/* Fix Streamlit default styles */
+/* Hide Streamlit's default sharing links (biographer/biography publisher) */
 .st-emotion-cache-1y4p8pa {
     display: none !important;
 }
 
-/* Remove Streamlit branding */
+/* Alternative method to hide specific links */
+a[href*="biographer"],
+a[href*="biography"],
+.stLink a {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Hide the entire header toolbar if needed */
 .stApp > header {
     display: none !important;
 }
 
+/* ============================================================================
+   FIX EXPORT BUTTON TRANSPARENCY
+   ============================================================================ */
+
+/* Fix download button transparency */
+.stDownloadButton button {
+    background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 1rem !important;
+    font-weight: 500 !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 4px rgba(0, 102, 204, 0.2) !important;
+}
+
+.stDownloadButton button:hover {
+    background: linear-gradient(135deg, #0052a3 0%, #003366 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3) !important;
+}
+
+/* ============================================================================
+   RESET & BASE STYLES
+   ============================================================================ */
+
+/* Remove Streamlit branding */
 .stApp > div:first-child {
     display: none !important;
 }
@@ -263,36 +286,6 @@
     background: linear-gradient(135deg, #0052a3 0%, #003366 100%) !important;
     transform: translateY(-2px) !important;
     box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3) !important;
-}
-
-/* ============================================================================
-   EXPORT BUTTON FIXES
-   ============================================================================ */
-
-/* Fix export button styling */
-.stDownloadButton button {
-    background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
-    color: white !important;
-    border: none !important;
-    opacity: 1 !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 2px 4px rgba(0, 102, 204, 0.2) !important;
-}
-
-.stDownloadButton button:hover {
-    background: linear-gradient(135deg, #0052a3 0%, #003366 100%) !important;
-    color: white !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3) !important;
-}
-
-/* Fix transparent button issue */
-.stDownloadButton button[kind="primary"] {
-    background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
-    color: white !important;
-    border: none !important;
 }
 
 /* ============================================================================
