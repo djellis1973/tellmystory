@@ -137,7 +137,7 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
             st.warning("⚠️ No sessions found in CSV file")
             return []
         
-        st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
+        # REMOVED: st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
         return sessions_list
         
     except Exception as e:
@@ -1237,31 +1237,20 @@ st.markdown(f"""
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
+    # REMOVED: st.header("👤 Your Profile") - Now using the reordered structure
+    
+    # REORDERED SIDEBAR AS REQUESTED:
+    
+    # 1. Your Profile
     st.header("👤 Your Profile")
     if st.session_state.user_account:
         profile = st.session_state.user_account['profile']
         st.success(f"✓ **{profile['first_name']} {profile['last_name']}**")
         
-        # ONLY show these - no email
-        if profile.get('birthdate'):
-            st.caption(f"🎂 Born: {profile['birthdate']}")
+        # REMOVED: Birthday and historical events lines
+        # REMOVED: Account type line
         
-        # Historical events with green checkmark
-        if profile.get('birthdate'):
-            try:
-                birth_year = int(profile['birthdate'].split(', ')[-1])
-                events = get_events_for_birth_year(birth_year)
-                if events:
-                    uk_events = [e for e in events if e.get('region') == 'UK']
-                    global_events = len(events) - len(uk_events)
-                    st.success(f"✓ {len(events)} historical events ({len(uk_events)} UK, {global_events} global)")
-            except:
-                pass
-        
-        account_type = st.session_state.user_account['account_type']
-        st.caption(f"👤 Account: {account_type.title()}")
-    
-    # Full width buttons
+    # Full width buttons (stacked)
     if st.button("📝 Edit Profile", use_container_width=True):
         st.session_state.show_profile_setup = True
         st.rerun()
@@ -1271,8 +1260,8 @@ with st.sidebar:
     
     st.divider()
     
-    # Writing Streak - UPDATED
-    st.subheader("🔥 Writing Streak")
+    # 2. Writing Streak
+    st.header("🔥 Writing Streak")
     streak_emoji = get_streak_emoji(st.session_state.streak_days)
     st.markdown(f"<div class='streak-flame'>{streak_emoji}</div>", unsafe_allow_html=True)
     st.markdown(f"**{st.session_state.streak_days} day streak**")
@@ -1285,8 +1274,38 @@ with st.sidebar:
     
     st.divider()
     
-    # Quick Capture - UPDATED
-    st.subheader("⚡ Quick Capture")
+    # 3. Sessions
+    st.header("📖 Sessions")
+    for i, session in enumerate(SESSIONS):
+        session_id = session["id"]
+        session_data = st.session_state.responses.get(session_id, {})
+        responses_count = len(session_data.get("questions", {}))
+        total_questions = len(session["questions"])
+        
+        # Traffic light system
+        if responses_count == total_questions:
+            status = "🔴"  # Red - Complete
+        elif responses_count > 0:
+            status = "🟡"  # Yellow - In progress
+        else:
+            status = "🟢"  # Green - Not started
+        
+        if i == st.session_state.current_session:
+            status = "▶️"  # Current session
+        
+        button_text = f"{status} Session {session_id}: {session['title']}"
+        if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
+            st.session_state.current_session = i
+            st.session_state.current_question = 0
+            st.session_state.editing = None
+            st.session_state.current_question_override = None
+            st.session_state.image_prompt_mode = False
+            st.rerun()
+    
+    st.divider()
+    
+    # 4. Quick Capture
+    st.header("⚡ Quick Capture")
     with st.expander("💭 Jot Now - Quick Memory", expanded=False):
         quick_note = st.text_area(
             "Got a memory? Jot it down:",
@@ -1320,37 +1339,66 @@ with st.sidebar:
     
     st.divider()
     
-    # Sessions - UPDATED with traffic light system
-    st.header("📖 Sessions")
-    for i, session in enumerate(SESSIONS):
-        session_id = session["id"]
-        session_data = st.session_state.responses.get(session_id, {})
-        responses_count = len(session_data.get("questions", {}))
-        total_questions = len(session["questions"])
-        
-        # Traffic light system
-        if responses_count == total_questions:
-            status = "🔴"  # Red - Complete
-        elif responses_count > 0:
-            status = "🟡"  # Yellow - In progress
-        else:
-            status = "🟢"  # Green - Not started
-        
-        if i == st.session_state.current_session:
-            status = "▶️"  # Current session
-        
-        button_text = f"{status} Session {session_id}: {session['title']}"
-        if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
-            st.session_state.current_session = i
-            st.session_state.current_question = 0
-            st.session_state.editing = None
-            st.session_state.current_question_override = None
-            st.session_state.image_prompt_mode = False
+    # 5. Vignettes
+    st.header("✨ Vignettes")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📝 New Vignette", use_container_width=True):
+            st.session_state.show_vignette_modal = True
+            st.rerun()
+    with col2:
+        if st.button("📖 View All", use_container_width=True):
+            st.session_state.show_vignette_manager = True
             st.rerun()
     
     st.divider()
     
-    # Interview Style - UPDATED
+    # 6. Historical Context
+    st.header("📜 Historical Context")
+    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
+        try:
+            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
+            events = get_events_for_birth_year(birth_year)
+            if events:
+                # REMOVED: Green checkmark and count display
+                st.caption(f"From {birth_year} to present")
+                with st.expander("View Sample Events", expanded=False):
+                    for i, event in enumerate(events[:5]):
+                        region_emoji = "🇬🇧" if event.get('region') == 'UK' else "🌍"
+                        st.markdown(f"**{region_emoji} {event['event']}**")
+                        st.caption(f"{event['year_range']} • {event.get('category', 'General')}")
+                        if i < 4:
+                            st.divider()
+        except:
+            st.info("Add birthdate to see historical context")
+    else:
+        st.info("Add your birthdate to enable historical context")
+    
+    st.divider()
+    
+    # 7. Session Management
+    st.header("📖 Session Management")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📋 All Sessions", use_container_width=True):
+            st.session_state.show_session_manager = True
+            st.rerun()
+    with col2:
+        if st.button("➕ Custom Session", use_container_width=True):
+            st.session_state.show_session_creator = True
+            st.rerun()
+    
+    st.divider()
+    
+    # 8. Topic Management
+    st.header("📚 Topic Management")
+    if st.button("🔍 Browse Topics", use_container_width=True):
+        st.session_state.show_topic_browser = True
+        st.rerun()
+    
+    st.divider()
+    
+    # 9. Interview Style
     st.header("✍️ Interview Style")
     ghostwriter_mode = st.toggle(
         "Professional Ghostwriter Mode",
@@ -1378,66 +1426,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Historical Context - UPDATED with green checkmark
-    st.header("📜 Historical Context")
-    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
-        try:
-            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
-            events = get_events_for_birth_year(birth_year)
-            if events:
-                st.success(f"✓ {len(events)} historical events loaded")
-                st.caption(f"From {birth_year} to present")
-                with st.expander("View Sample Events", expanded=False):
-                    for i, event in enumerate(events[:5]):
-                        region_emoji = "🇬🇧" if event.get('region') == 'UK' else "🌍"
-                        st.markdown(f"**{region_emoji} {event['event']}**")
-                        st.caption(f"{event['year_range']} • {event.get('category', 'General')}")
-                        if i < 4:
-                            st.divider()
-        except:
-            st.info("Add birthdate to see historical context")
-    else:
-        st.info("Add your birthdate to enable historical context")
-    
-    st.divider()
-    
-    # Vignettes - UPDATED
-    st.header("✨ Vignettes")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📝 New Vignette", use_container_width=True):
-            st.session_state.show_vignette_modal = True
-            st.rerun()
-    with col2:
-        if st.button("📖 View All", use_container_width=True):
-            st.session_state.show_vignette_manager = True
-            st.rerun()
-    
-    st.divider()
-    
-    # Session Management - UPDATED
-    st.header("📖 Session Management")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📋 All Sessions", use_container_width=True):
-            st.session_state.show_session_manager = True
-            st.rerun()
-    with col2:
-        if st.button("➕ Custom Session", use_container_width=True):
-            st.session_state.show_session_creator = True
-            st.rerun()
-    
-    st.divider()
-    
-    # Topic Management - UPDATED
-    st.header("📚 Topic Management")
-    if st.button("🔍 Browse Topics", use_container_width=True):
-        st.session_state.show_topic_browser = True
-        st.rerun()
-    
-    st.divider()
-    
-    # Export Options
+    # 10. Export Options
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
     st.caption(f"Total answers: {total_answers}")
@@ -1515,8 +1504,10 @@ with st.sidebar:
     
     st.divider()
     
-    # Clear Data - UPDATED
+    # 11. Clear Data - WITH DISCLAIMER
     st.subheader("⚠️ Clear Data")
+    st.caption("**WARNING: This action cannot be undone - you will lose all your work!**")
+    
     if st.session_state.confirming_clear == "session":
         st.markdown('<div class="warning-box">', unsafe_allow_html=True)
         st.warning("**WARNING: This will delete ALL answers in the current session!**")
