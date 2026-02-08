@@ -19,13 +19,7 @@ import sys
 # Add current directory to path to import modules
 sys.path.append('.')
 
-# ── PAGE CONFIG MUST BE FIRST ────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Tell My Story",  # Give it a real title
-    page_icon="📖",
-    layout="wide",
-    initial_sidebar_state="expanded"  # Like the working version
-)
+st.set_page_config(page_title="Tell My Story", page_icon="📖", layout="wide")
 
 # Now import modules (AFTER page config)
 try:
