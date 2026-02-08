@@ -137,7 +137,6 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
             st.warning("⚠️ No sessions found in CSV file")
             return []
         
-        # REMOVED: st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
         return sessions_list
         
     except Exception as e:
@@ -371,7 +370,8 @@ def logout_user():
         'show_vignette_manager', 'custom_topic_input', 'show_custom_topic_modal',
         'show_topic_browser', 'show_session_manager', 'show_session_creator',
         'editing_custom_session', 'show_vignette_detail', 'selected_vignette_id',
-        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery'
+        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery',
+        'deleting_answer', 'confirm_delete_answer_index'
     ]
     for key in keys:
         st.session_state.pop(key, None)
@@ -565,6 +565,26 @@ def save_response(session_id, question, answer):
     }
     
     return save_user_data(user_id, st.session_state.responses)
+
+def delete_response(session_id, question):
+    """Delete a specific response"""
+    user_id = st.session_state.user_id
+    if not user_id or user_id == "":
+        return False
+    
+    if session_id in st.session_state.responses:
+        if question in st.session_state.responses[session_id]["questions"]:
+            # Delete from responses
+            del st.session_state.responses[session_id]["questions"][question]
+            
+            # Delete from conversation history
+            if session_id in st.session_state.session_conversations:
+                if question in st.session_state.session_conversations[session_id]:
+                    del st.session_state.session_conversations[session_id][question]
+            
+            # Save to file
+            return save_user_data(user_id, st.session_state.responses)
+    return False
 
 def calculate_author_word_count(session_id):
     total_words = 0
@@ -955,6 +975,8 @@ default_state = {
     "selected_vignette_for_session": None,
     "published_vignette": None,
     "show_image_gallery": False,
+    "deleting_answer": False,
+    "confirm_delete_answer_index": None,
 }
 
 for key, value in default_state.items():
@@ -1699,7 +1721,7 @@ for i, message in enumerate(conversation):
                     st.caption(f"📝 Editing: {edit_word_count} words")
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✓ Save", key=f"save_{current_session_id}_{hash(current_question_text)}_{i}", type="primary"):
+                        if st.button("✓ Save", key=f"save_{current_session_id}_{hash(current_question_text)}_{i}", type="primary", use_container_width=True):
                             if st.session_state.spellcheck_enabled:
                                 new_text = auto_correct_text(new_text)
                             conversation[i]["content"] = new_text
@@ -1708,20 +1730,45 @@ for i, message in enumerate(conversation):
                             st.session_state.editing = None
                             st.rerun()
                     with col2:
-                        if st.button("✕ Cancel", key=f"cancel_{current_session_id}_{hash(current_question_text)}_{i}"):
+                        if st.button("✕ Cancel", key=f"cancel_{current_session_id}_{hash(current_question_text)}_{i}", use_container_width=True):
                             st.session_state.editing = None
                             st.rerun()
             else:
-                col1, col2 = st.columns([5, 1])
+                col1, col2, col3 = st.columns([4, 1, 1])
                 with col1:
                     st.markdown(message["content"])
                     word_count = len(re.findall(r'\w+', message["content"]))
-                    st.caption(f"📝 {word_count} words • Click ✏️ to edit")
+                    st.caption(f"📝 {word_count} words")
                 with col2:
-                    if st.button("✏️", key=f"edit_{st.session_state.current_session}_{hash(current_question_text)}_{i}"):
+                    if st.button("✏️", key=f"edit_{st.session_state.current_session}_{hash(current_question_text)}_{i}", use_container_width=True):
                         st.session_state.editing = (current_session_id, current_question_text, i)
                         st.session_state.edit_text = message["content"]
                         st.rerun()
+                with col3:
+                    if st.button("🗑️", key=f"delete_{st.session_state.current_session}_{hash(current_question_text)}_{i}", use_container_width=True):
+                        st.session_state.confirm_delete_answer_index = i
+                        st.rerun()
+        
+        # Show delete confirmation if needed
+        if st.session_state.get('confirm_delete_answer_index') == i:
+            st.warning("⚠️ Are you sure you want to delete this answer?")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Yes, Delete", key=f"confirm_delete_{i}", type="primary", use_container_width=True):
+                    # Remove from conversation
+                    conversation.pop(i)
+                    st.session_state.session_conversations[current_session_id][current_question_text] = conversation
+                    
+                    # Remove from saved responses
+                    delete_response(current_session_id, current_question_text)
+                    
+                    st.session_state.confirm_delete_answer_index = None
+                    st.success("Answer deleted!")
+                    st.rerun()
+            with col2:
+                if st.button("❌ Cancel", key=f"cancel_delete_{i}", use_container_width=True):
+                    st.session_state.confirm_delete_answer_index = None
+                    st.rerun()
 
 # BIG ANSWER BOX with SAVE button (not arrow)
 st.write("")
@@ -1744,33 +1791,48 @@ with col1:
             
             save_response(current_session_id, current_question_text, user_input)
             
-            with st.chat_message("assistant", avatar="👔"):
-                with st.spinner("Reflecting on your story..."):
-                    try:
-                        conversation_history = conversation[:-1]
-                        messages_for_api = [
-                            {"role": "system", "content": get_system_prompt()},
-                            *conversation_history,
-                            {"role": "user", "content": user_input}
-                        ]
-                        temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
-                        max_tokens = 400 if st.session_state.ghostwriter_mode else 300
-                        response = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=messages_for_api,
-                            temperature=temperature,
-                            max_tokens=max_tokens
-                        )
-                        ai_response = response.choices[0].message.content
-                        if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
-                            ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
+            # Clear the text area after saving
+            st.session_state.long_form_answer = ""
+            
+            # Generate AI response
+            with st.spinner("Reflecting on your story..."):
+                try:
+                    conversation_history = conversation[:-1]  # Exclude the just-added user message
+                    messages_for_api = [
+                        {"role": "system", "content": get_system_prompt()},
+                        *conversation_history,
+                        {"role": "user", "content": user_input}
+                    ]
+                    temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
+                    max_tokens = 400 if st.session_state.ghostwriter_mode else 300
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages_for_api,
+                        temperature=temperature,
+                        max_tokens=max_tokens
+                    )
+                    ai_response = response.choices[0].message.content
+                    if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
+                        ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
+                    
+                    # Display AI response
+                    with st.chat_message("assistant", avatar="👔"):
                         st.markdown(ai_response)
-                        conversation.append({"role": "assistant", "content": ai_response})
-                    except Exception as e:
-                        error_msg = "Thank you for sharing that. Your response has been saved."
+                    
+                    # Add AI response to conversation
+                    conversation.append({"role": "assistant", "content": ai_response})
+                    
+                    # Save conversation to session state
+                    st.session_state.session_conversations[current_session_id][current_question_text] = conversation
+                    
+                except Exception as e:
+                    error_msg = "Thank you for sharing that. Your response has been saved. I'll reflect on this and respond shortly."
+                    with st.chat_message("assistant", avatar="👔"):
                         st.markdown(error_msg)
-                        conversation.append({"role": "assistant", "content": error_msg})
-            st.session_state.session_conversations[current_session_id][current_question_text] = conversation
+                    conversation.append({"role": "assistant", "content": error_msg})
+                    st.session_state.session_conversations[current_session_id][current_question_text] = conversation
+                    print(f"Error generating AI response: {e}")
+            
             st.rerun()
         else:
             st.warning("Please write something before saving!")
@@ -1789,6 +1851,7 @@ with col2:
                 st.session_state.editing = None
                 st.session_state.current_question_override = None
                 st.session_state.image_prompt_mode = False
+                st.session_state.confirm_delete_answer_index = None
                 st.rerun()
     
     with nav_col2:
@@ -1802,6 +1865,7 @@ with col2:
                 st.session_state.editing = None
                 st.session_state.current_question_override = None
                 st.session_state.image_prompt_mode = False
+                st.session_state.confirm_delete_answer_index = None
                 st.rerun()
 
 # Session Progress
