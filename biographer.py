@@ -1294,7 +1294,7 @@ with st.sidebar:
         if i == st.session_state.current_session:
             status = "▶️"  # Current session
         
-        # REMOVED "Session" from button text
+        # REMOVED "Session" from button text - format is just "Number: Title"
         button_text = f"{status} {session_id}: {session['title']}"
         
         if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
@@ -1320,21 +1320,24 @@ with st.sidebar:
         )
         
         # Stacked buttons inside expander
-        if st.button("💾 Save Jot", key="save_jot_btn", use_container_width=True):
-            if quick_note and quick_note.strip():
-                estimated_year = estimate_year_from_text(quick_note)
-                save_jot(quick_note, estimated_year)
-                st.success("Saved! ✨")
-                st.rerun()
-            else:
-                st.warning("Please write something first!")
+        col_jot1, col_jot2 = st.columns(2)
+        with col_jot1:
+            if st.button("💾 Save Jot", key="save_jot_btn", use_container_width=True):
+                if quick_note and quick_note.strip():
+                    estimated_year = estimate_year_from_text(quick_note)
+                    save_jot(quick_note, estimated_year)
+                    st.success("Saved! ✨")
+                    st.rerun()
+                else:
+                    st.warning("Please write something first!")
         
-        use_disabled = not quick_note or not quick_note.strip()
-        if st.button("📝 Use as Prompt", key="use_jot_btn", use_container_width=True, disabled=use_disabled):
-            st.session_state.current_question_override = quick_note
-            st.info("Ready to write about this!")
-            st.rerun()
-            
+        with col_jot2:
+            use_disabled = not quick_note or not quick_note.strip()
+            if st.button("📝 Use as Prompt", key="use_jot_btn", use_container_width=True, disabled=use_disabled):
+                st.session_state.current_question_override = quick_note
+                st.info("Ready to write about this!")
+                st.rerun()
+                
         if st.session_state.get('quick_jots'):
             st.caption(f"📝 {len(st.session_state.quick_jots)} quick notes saved")
             if st.button("View Quick Notes", key="view_jots_btn", use_container_width=True):
@@ -1345,13 +1348,16 @@ with st.sidebar:
     
     # 5. Vignettes - FIXED: Now stacked
     st.header("✨ Vignettes")
-    if st.button("📝 New Vignette", use_container_width=True):
-        st.session_state.show_vignette_modal = True
-        st.rerun()
+    vignette_col1, vignette_col2 = st.columns(2)
+    with vignette_col1:
+        if st.button("📝 New", use_container_width=True):
+            st.session_state.show_vignette_modal = True
+            st.rerun()
     
-    if st.button("📖 View All", use_container_width=True):
-        st.session_state.show_vignette_manager = True
-        st.rerun()
+    with vignette_col2:
+        if st.button("📖 View All", use_container_width=True):
+            st.session_state.show_vignette_manager = True
+            st.rerun()
     
     st.divider()
     
@@ -1380,13 +1386,16 @@ with st.sidebar:
     
     # 7. Session Management - FIXED: Now stacked
     st.header("📖 Session Management")
-    if st.button("📋 All Sessions", use_container_width=True):
-        st.session_state.show_session_manager = True
-        st.rerun()
+    session_col1, session_col2 = st.columns(2)
+    with session_col1:
+        if st.button("📋 All", use_container_width=True):
+            st.session_state.show_session_manager = True
+            st.rerun()
     
-    if st.button("➕ Custom Session", use_container_width=True):
-        st.session_state.show_session_creator = True
-        st.rerun()
+    with session_col2:
+        if st.button("➕ Custom", use_container_width=True):
+            st.session_state.show_session_creator = True
+            st.rerun()
     
     st.divider()
     
@@ -1426,7 +1435,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 10. Export Options - FIXED: Blue download buttons
+    # 10. Export Options - FIXED: Blue download buttons with proper styling
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
     st.caption(f"Total answers: {total_answers}")
@@ -1462,7 +1471,7 @@ with st.sidebar:
             publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
             publisher_url = f"{publisher_base_url}?data={encoded_data}"
             
-            # Stacked download buttons - now styled with blue theme
+            # Stacked download buttons - now with proper styling
             stories_only = {
                 "user": st.session_state.user_id,
                 "stories": export_data,
@@ -1470,25 +1479,27 @@ with st.sidebar:
             }
             stories_json = json.dumps(stories_only, indent=2)
             
-            if st.download_button(
-                label="📥 Stories Only",
-                data=stories_json,
-                file_name=f"Tell_My_Story_Stories_{st.session_state.user_id}.json",
-                mime="application/json",
-                use_container_width=True,
-                key="download_stories_btn"
-            ):
-                pass
+            # Two columns for download buttons
+            export_col1, export_col2 = st.columns(2)
+            with export_col1:
+                st.download_button(
+                    label="📥 Stories Only",
+                    data=stories_json,
+                    file_name=f"Tell_My_Story_Stories_{st.session_state.user_id}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    key="download_stories_btn"
+                )
             
-            if st.download_button(
-                label="📊 Complete Data",
-                data=json_data,
-                file_name=f"Tell_My_Story_Complete_{st.session_state.user_id}.json",
-                mime="application/json",
-                use_container_width=True,
-                key="download_complete_btn"
-            ):
-                pass
+            with export_col2:
+                st.download_button(
+                    label="📊 Complete Data",
+                    data=json_data,
+                    file_name=f"Tell_My_Story_Complete_{st.session_state.user_id}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    key="download_complete_btn"
+                )
             
             st.divider()
             st.markdown(f'''
@@ -1514,51 +1525,59 @@ with st.sidebar:
         st.markdown('<div class="warning-box">', unsafe_allow_html=True)
         st.warning("**WARNING: This will delete ALL answers in the current session!**")
         
-        if st.button("✅ Confirm Delete Session", type="primary", use_container_width=True, key="confirm_delete_session"):
-            current_session_id = SESSIONS[st.session_state.current_session]["id"]
-            try:
-                st.session_state.responses[current_session_id]["questions"] = {}
-                save_user_data(st.session_state.user_id, st.session_state.responses)
+        clear_col1, clear_col2 = st.columns(2)
+        with clear_col1:
+            if st.button("✅ Confirm", type="primary", use_container_width=True, key="confirm_delete_session"):
+                current_session_id = SESSIONS[st.session_state.current_session]["id"]
+                try:
+                    st.session_state.responses[current_session_id]["questions"] = {}
+                    save_user_data(st.session_state.user_id, st.session_state.responses)
+                    st.session_state.confirming_clear = None
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        
+        with clear_col2:
+            if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_session"):
                 st.session_state.confirming_clear = None
                 st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-        
-        if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_session"):
-            st.session_state.confirming_clear = None
-            st.rerun()
-            
+                
         st.markdown('</div>', unsafe_allow_html=True)
     elif st.session_state.confirming_clear == "all":
         st.markdown('<div class="warning-box">', unsafe_allow_html=True)
         st.warning("**WARNING: This will delete ALL answers for ALL sessions!**")
         
-        if st.button("✅ Confirm Delete All", type="primary", use_container_width=True, key="confirm_delete_all"):
-            try:
-                for session in SESSIONS:
-                    session_id = session["id"]
-                    st.session_state.responses[session_id]["questions"] = {}
-                save_user_data(st.session_state.user_id, st.session_state.responses)
+        clear_col1, clear_col2 = st.columns(2)
+        with clear_col1:
+            if st.button("✅ Confirm", type="primary", use_container_width=True, key="confirm_delete_all"):
+                try:
+                    for session in SESSIONS:
+                        session_id = session["id"]
+                        st.session_state.responses[session_id]["questions"] = {}
+                    save_user_data(st.session_state.user_id, st.session_state.responses)
+                    st.session_state.confirming_clear = None
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        
+        with clear_col2:
+            if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_all"):
                 st.session_state.confirming_clear = None
                 st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-        
-        if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_all"):
-            st.session_state.confirming_clear = None
-            st.rerun()
-            
+                
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         # Stacked clear buttons
-        if st.button("🗑️ Clear Session", type="secondary", use_container_width=True, key="clear_session_btn"):
-            st.session_state.confirming_clear = "session"
-            st.rerun()
+        clear_col1, clear_col2 = st.columns(2)
+        with clear_col1:
+            if st.button("🗑️ Clear Session", type="secondary", use_container_width=True, key="clear_session_btn"):
+                st.session_state.confirming_clear = "session"
+                st.rerun()
         
-        if st.button("🔥 Clear All", type="secondary", use_container_width=True, key="clear_all_btn"):
-            st.session_state.confirming_clear = "all"
-            st.rerun()
-
+        with clear_col2:
+            if st.button("🔥 Clear All", type="secondary", use_container_width=True, key="clear_all_btn"):
+                st.session_state.confirming_clear = "all"
+                st.rerun()
 # ── Main Content Area ─────────────────────────────────────────────────────────
 # Check if we have a valid current session
 if st.session_state.current_session >= len(SESSIONS):
