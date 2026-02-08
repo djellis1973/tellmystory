@@ -137,6 +137,7 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
             st.warning("⚠️ No sessions found in CSV file")
             return []
         
+        # REMOVED: st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
         return sessions_list
         
     except Exception as e:
@@ -370,8 +371,7 @@ def logout_user():
         'show_vignette_manager', 'custom_topic_input', 'show_custom_topic_modal',
         'show_topic_browser', 'show_session_manager', 'show_session_creator',
         'editing_custom_session', 'show_vignette_detail', 'selected_vignette_id',
-        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery',
-        'deleting_answer', 'confirm_delete_answer_index'
+        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery'
     ]
     for key in keys:
         st.session_state.pop(key, None)
@@ -565,26 +565,6 @@ def save_response(session_id, question, answer):
     }
     
     return save_user_data(user_id, st.session_state.responses)
-
-def delete_response(session_id, question):
-    """Delete a specific response"""
-    user_id = st.session_state.user_id
-    if not user_id or user_id == "":
-        return False
-    
-    if session_id in st.session_state.responses:
-        if question in st.session_state.responses[session_id]["questions"]:
-            # Delete from responses
-            del st.session_state.responses[session_id]["questions"][question]
-            
-            # Delete from conversation history
-            if session_id in st.session_state.session_conversations:
-                if question in st.session_state.session_conversations[session_id]:
-                    del st.session_state.session_conversations[session_id][question]
-            
-            # Save to file
-            return save_user_data(user_id, st.session_state.responses)
-    return False
 
 def calculate_author_word_count(session_id):
     total_words = 0
@@ -975,8 +955,6 @@ default_state = {
     "selected_vignette_for_session": None,
     "published_vignette": None,
     "show_image_gallery": False,
-    "deleting_answer": False,
-    "confirm_delete_answer_index": None,
 }
 
 for key, value in default_state.items():
@@ -1259,14 +1237,6 @@ st.markdown(f"""
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Add "Tell My Story" header at top of sidebar
-    st.markdown("""
-    <div style="text-align: center; padding: 1rem 0; margin-bottom: 1rem; border-bottom: 2px solid #b5f5ec;">
-        <h2 style="color: #0066cc; margin: 0;">Tell My Story</h2>
-        <p style="color: #36cfc9; font-size: 0.9rem; margin: 0.25rem 0 0 0;">Your Life Timeline</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
     # 1. Your Profile
     st.header("👤 Your Profile")
     if st.session_state.user_account:
@@ -1297,7 +1267,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 3. Sessions - FIXED: Removed "Session" from button text
+    # 3. Sessions - FIXED: Left justified text
     st.header("📖 Sessions")
     for i, session in enumerate(SESSIONS):
         session_id = session["id"]
@@ -1316,8 +1286,18 @@ with st.sidebar:
         if i == st.session_state.current_session:
             status = "▶️"  # Current session
         
-        # REMOVED "Session" from button text
-        button_text = f"{status} {session_id}: {session['title']}"
+        button_text = f"{status} Session {session_id}: {session['title']}"
+        # Add custom CSS for left-aligned text
+        st.markdown("""
+        <style>
+        div[data-testid="column"] .stButton button,
+        section[data-testid="stSidebar"] .stButton button {
+            text-align: left !important;
+            justify-content: flex-start !important;
+            padding-left: 1rem !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
         if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
             st.session_state.current_session = i
@@ -1377,7 +1357,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 6. Historical Context
+    # 6. Historical Context - FIXED: Blue expander button
     st.header("📜 Historical Context")
     if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
         try:
@@ -1385,6 +1365,22 @@ with st.sidebar:
             events = get_events_for_birth_year(birth_year)
             if events:
                 st.caption(f"From {birth_year} to present")
+                
+                # Custom CSS for blue expander
+                st.markdown("""
+                <style>
+                .streamlit-expanderHeader {
+                    background: linear-gradient(135deg, #1890ff 0%, #36cfc9 100%) !important;
+                    color: white !important;
+                    border-radius: 8px !important;
+                    border: 2px solid #b5f5ec !important;
+                }
+                
+                .streamlit-expanderHeader:hover {
+                    background: linear-gradient(135deg, #096dd9 0%, #13c2c2 100%) !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
                 
                 with st.expander("View Sample Events", expanded=False):
                     for i, event in enumerate(events[:5]):
@@ -1448,7 +1444,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 10. Export Options - FIXED: Blue download buttons
+    # 10. Export Options - FIXED: Now stacked
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
     st.caption(f"Total answers: {total_answers}")
@@ -1484,17 +1480,14 @@ with st.sidebar:
             publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
             publisher_url = f"{publisher_base_url}?data={encoded_data}"
             
-            # Stacked download buttons - now styled with blue theme
-            stories_only = {
-                "user": st.session_state.user_id,
-                "stories": export_data,
-                "export_date": datetime.now().isoformat()
-            }
-            stories_json = json.dumps(stories_only, indent=2)
-            
+            # Stacked download buttons
             if st.download_button(
                 label="📥 Stories Only",
-                data=stories_json,
+                data=json.dumps({
+                    "user": st.session_state.user_id,
+                    "stories": export_data,
+                    "export_date": datetime.now().isoformat()
+                }, indent=2),
                 file_name=f"Tell_My_Story_Stories_{st.session_state.user_id}.json",
                 mime="application/json",
                 use_container_width=True,
@@ -1721,7 +1714,7 @@ for i, message in enumerate(conversation):
                     st.caption(f"📝 Editing: {edit_word_count} words")
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✓ Save", key=f"save_{current_session_id}_{hash(current_question_text)}_{i}", type="primary", use_container_width=True):
+                        if st.button("✓ Save", key=f"save_{current_session_id}_{hash(current_question_text)}_{i}", type="primary"):
                             if st.session_state.spellcheck_enabled:
                                 new_text = auto_correct_text(new_text)
                             conversation[i]["content"] = new_text
@@ -1730,56 +1723,27 @@ for i, message in enumerate(conversation):
                             st.session_state.editing = None
                             st.rerun()
                     with col2:
-                        if st.button("✕ Cancel", key=f"cancel_{current_session_id}_{hash(current_question_text)}_{i}", use_container_width=True):
+                        if st.button("✕ Cancel", key=f"cancel_{current_session_id}_{hash(current_question_text)}_{i}"):
                             st.session_state.editing = None
                             st.rerun()
             else:
-                col1, col2, col3 = st.columns([4, 1, 1])
+                col1, col2 = st.columns([5, 1])
                 with col1:
                     st.markdown(message["content"])
                     word_count = len(re.findall(r'\w+', message["content"]))
-                    st.caption(f"📝 {word_count} words")
+                    st.caption(f"📝 {word_count} words • Click ✏️ to edit")
                 with col2:
-                    if st.button("✏️", key=f"edit_{st.session_state.current_session}_{hash(current_question_text)}_{i}", use_container_width=True):
+                    if st.button("✏️", key=f"edit_{st.session_state.current_session}_{hash(current_question_text)}_{i}"):
                         st.session_state.editing = (current_session_id, current_question_text, i)
                         st.session_state.edit_text = message["content"]
                         st.rerun()
-                with col3:
-                    if st.button("🗑️", key=f"delete_{st.session_state.current_session}_{hash(current_question_text)}_{i}", use_container_width=True):
-                        st.session_state.confirm_delete_answer_index = i
-                        st.rerun()
-        
-        # Show delete confirmation if needed
-        if st.session_state.get('confirm_delete_answer_index') == i:
-            st.warning("⚠️ Are you sure you want to delete this answer?")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("✅ Yes, Delete", key=f"confirm_delete_{i}", type="primary", use_container_width=True):
-                    # Remove from conversation
-                    conversation.pop(i)
-                    st.session_state.session_conversations[current_session_id][current_question_text] = conversation
-                    
-                    # Remove from saved responses
-                    delete_response(current_session_id, current_question_text)
-                    
-                    st.session_state.confirm_delete_answer_index = None
-                    st.success("Answer deleted!")
-                    st.rerun()
-            with col2:
-                if st.button("❌ Cancel", key=f"cancel_delete_{i}", use_container_width=True):
-                    st.session_state.confirm_delete_answer_index = None
-                    st.rerun()
 
 # BIG ANSWER BOX with SAVE button (not arrow)
 st.write("")
 st.write("")
-
-# Create a unique key for the text area that includes the current question
-text_area_key = f"long_form_answer_{current_session_id}_{hash(current_question_text)}"
-
 user_input = st.text_area(
     "Type your long-form answer here...",
-    key=text_area_key,
+    key="long_form_answer",
     height=200,
     placeholder="Write your detailed response here. This is where you should write your full story...",
     label_visibility="visible"
@@ -1789,62 +1753,39 @@ col1, col2 = st.columns([1, 3])
 with col1:
     if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
         if user_input:
-            # Apply spellcheck if enabled
             if st.session_state.spellcheck_enabled:
-                corrected_text = auto_correct_text(user_input)
-                # Update the session state with corrected text so it shows in the text area
-                st.session_state[text_area_key] = corrected_text
-                user_input = corrected_text  # Use corrected text for saving
-            
-            # Add user message to conversation
+                user_input = auto_correct_text(user_input)
             conversation.append({"role": "user", "content": user_input})
             
-            # Save the response
             save_response(current_session_id, current_question_text, user_input)
             
-            # Generate AI response
-            with st.spinner("Reflecting on your story..."):
-                try:
-                    conversation_history = conversation[:-1]  # Exclude the just-added user message
-                    messages_for_api = [
-                        {"role": "system", "content": get_system_prompt()},
-                        *conversation_history,
-                        {"role": "user", "content": user_input}
-                    ]
-                    temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
-                    max_tokens = 400 if st.session_state.ghostwriter_mode else 300
-                    response = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=messages_for_api,
-                        temperature=temperature,
-                        max_tokens=max_tokens
-                    )
-                    ai_response = response.choices[0].message.content
-                    if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
-                        ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
-                    
-                    # Display AI response
-                    with st.chat_message("assistant", avatar="👔"):
+            with st.chat_message("assistant", avatar="👔"):
+                with st.spinner("Reflecting on your story..."):
+                    try:
+                        conversation_history = conversation[:-1]
+                        messages_for_api = [
+                            {"role": "system", "content": get_system_prompt()},
+                            *conversation_history,
+                            {"role": "user", "content": user_input}
+                        ]
+                        temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
+                        max_tokens = 400 if st.session_state.ghostwriter_mode else 300
+                        response = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=messages_for_api,
+                            temperature=temperature,
+                            max_tokens=max_tokens
+                        )
+                        ai_response = response.choices[0].message.content
+                        if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
+                            ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
                         st.markdown(ai_response)
-                    
-                    # Add AI response to conversation
-                    conversation.append({"role": "assistant", "content": ai_response})
-                    
-                    # Save conversation to session state
-                    st.session_state.session_conversations[current_session_id][current_question_text] = conversation
-                    
-                except Exception as e:
-                    error_msg = "Thank you for sharing that. Your response has been saved. I'll reflect on this and respond shortly."
-                    with st.chat_message("assistant", avatar="👔"):
+                        conversation.append({"role": "assistant", "content": ai_response})
+                    except Exception as e:
+                        error_msg = "Thank you for sharing that. Your response has been saved."
                         st.markdown(error_msg)
-                    conversation.append({"role": "assistant", "content": error_msg})
-                    st.session_state.session_conversations[current_session_id][current_question_text] = conversation
-                    print(f"Error generating AI response: {e}")
-            
-            # Clear the text area by removing its session state
-            if text_area_key in st.session_state:
-                del st.session_state[text_area_key]
-            
+                        conversation.append({"role": "assistant", "content": error_msg})
+            st.session_state.session_conversations[current_session_id][current_question_text] = conversation
             st.rerun()
         else:
             st.warning("Please write something before saving!")
@@ -1863,7 +1804,6 @@ with col2:
                 st.session_state.editing = None
                 st.session_state.current_question_override = None
                 st.session_state.image_prompt_mode = False
-                st.session_state.confirm_delete_answer_index = None
                 st.rerun()
     
     with nav_col2:
@@ -1877,7 +1817,6 @@ with col2:
                 st.session_state.editing = None
                 st.session_state.current_question_override = None
                 st.session_state.image_prompt_mode = False
-                st.session_state.confirm_delete_answer_index = None
                 st.rerun()
 
 # Session Progress
@@ -2045,3 +1984,4 @@ Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} �
     st.caption(footer_info)
 else:
     st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
+
