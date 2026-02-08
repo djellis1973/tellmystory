@@ -901,13 +901,12 @@ def show_session_manager():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Page Config & State ───────────────────────────────────────────────────────
-# ── Page Config & State ───────────────────────────────────────────────────────
 # Set a default page config with NO SIDEBAR
 st.set_page_config(
-    page_title="",  # Empty title
+    page_title="Tell My Story",  # ✅ ADD A TITLE HERE
     page_icon="📖",
     layout="wide",
-    initial_sidebar_state="collapsed"  # Changed from "expanded"
+    initial_sidebar_state="expanded"  # ✅ Change back to "expanded"
 )
 
 # Immediately after page config, add CSS to hide the page title
