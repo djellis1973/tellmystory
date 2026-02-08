@@ -901,12 +901,34 @@ def show_session_manager():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Page Config & State ───────────────────────────────────────────────────────
+# ── Page Config & State ───────────────────────────────────────────────────────
+# Set a default page config with NO SIDEBAR
 st.set_page_config(
-    page_title="",  # Empty string removes the title
+    page_title="",  # Empty title
     page_icon="📖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"  # Changed from "expanded"
 )
+
+# Immediately after page config, add CSS to hide the page title
+st.markdown("""
+<style>
+    /* Hide the Streamlit page title that shows "biographer" */
+    .st-emotion-cache-10trblm {
+        display: none !important;
+    }
+    
+    /* Hide the header */
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
+    
+    /* Hide the default sidebar on login page */
+    .st-emotion-cache-6qob1r {
+        display: none !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 default_state = {
     "logged_in": False,
