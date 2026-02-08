@@ -16,8 +16,6 @@ import pandas as pd
 import uuid
 import sys
 
-# Add current directory to path to import modules
-sys.path.append('.')
 
 # Import ALL modules
 try:
