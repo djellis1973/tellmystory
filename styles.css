@@ -1,4 +1,26 @@
-/* styles.css - MemLife styling */
+/* styles.css - tellmystory styling */
+
+/* ============================================================================
+   HIDE STREAMLIT DEFAULT TITLES - ADD TO TOP OF styles.css
+   ============================================================================ */
+
+/* Hide ALL page titles and headers */
+h1,
+.st-emotion-cache-10trblm,
+header[data-testid="stHeader"],
+.st-emotion-cache-1v0mbdj,
+div[data-testid="stDecoration"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Adjust main app container */
+.stApp {
+    margin-top: -2rem !important;
+}
 
 /* ============================================================================
    General Layout & Typography
