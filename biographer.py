@@ -2570,4 +2570,3 @@ if st.session_state.user_account:
     st.caption(footer_info)
 else:
     st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
-
