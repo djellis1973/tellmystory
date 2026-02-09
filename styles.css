@@ -1,40 +1,26 @@
 /* styles.css - tellmystory styling - BLUE/GREEN THEME */
-import streamlit as st
+/* ============================================================================
+   REMOVE STREAMLIT SIDEBAR NAVIGATION ONLY
+   ============================================================================ */
 
-st.markdown("""
-<div id="sidebar-debug"></div>
-<script>
-    setTimeout(() => {
-        const sidebar = document.querySelector('[data-testid="stSidebar"]');
-        const debugDiv = document.getElementById('sidebar-debug');
-        
-        if (sidebar) {
-            const children = sidebar.children[0].children;
-            let html = '<h3>Sidebar Structure:</h3>';
-            
-            for (let i = 0; i < children.length; i++) {
-                const child = children[i];
-                const text = child.textContent.substring(0, 50);
-                html += `
-                    <div style="border: 2px solid #ccc; margin: 5px; padding: 5px;">
-                        <strong>Child ${i}:</strong><br>
-                        Classes: ${child.className}<br>
-                        Text: "${text}..."<br>
-                        Has 'You' or 'Apps': ${text.includes('You') || text.includes('Apps')}
-                    </div>
-                `;
-            }
-            
-            debugDiv.innerHTML = html;
-        }
-    }, 1000);
-</script>
-""", unsafe_allow_html=True)
+/* Hide the navigation/app switcher section at the top of sidebar */
+section[data-testid="stSidebar"] > div:first-child > div:first-child,
+div[data-testid="stSidebarNav"],
+[data-testid="stSidebarUserContent"] {
+    display: none !important;
+}
 
-# Your actual sidebar
-with st.sidebar:
-    st.title("Your App")
-    st.button("Test Button")
+/* Ensure YOUR sidebar content remains visible */
+section[data-testid="stSidebar"] > div:first-child > div:nth-child(2) {
+    display: block !important;
+}
+
+/* Specifically target the "You" and "Apps" sections */
+div[class*="sidebar-nav"],
+nav[class*="sidebar"],
+div[class*="stSidebarNav"] {
+    display: none !important;
+}
 
 /* Add these styles to your existing styles.css file */
 
