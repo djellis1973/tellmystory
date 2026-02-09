@@ -1,29 +1,13 @@
 # biographer.py – Tell My Story App (Complete Working Version)
 import streamlit as st
 
-# Add this BEFORE anything else in your script
-hide_sidebar_nav = """
+# Add this at the VERY TOP of your script
+st.markdown("""
 <style>
-    /* Hide the entire sidebar navigation with the app switcher */
-    [data-testid="stSidebarNav"] {
-        display: none !important;
-    }
-    
-    /* Hide the collapsed control (hamburger menu) if present */
-    [data-testid="collapsedControl"] {
-        display: none !important;
-    }
-    
-    /* If you see "You" or "Apps" sections, target them directly */
-    [data-testid="stSidebarUserContent"] {
-        display: none !important;
-    }
-    
-    /* For the new Streamlit navigation */
-    section[data-testid="stSidebar"] > div:nth-child(1) > div:nth-child(1) {
-        display: none !important;
-    }
+    /* This one line often does the trick */
+    [data-testid="stSidebarNav"] {display: none;}
 </style>
+""", unsafe_allow_html=True)le>
 """
 
 st.markdown(hide_sidebar_nav, unsafe_allow_html=True)
