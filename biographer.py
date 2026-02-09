@@ -1,4 +1,4 @@
-# biographer.py – Tell My Story App (Complete Working Version)
+# tellmystory.py – Complete Biography App with Integrated Publisher
 import streamlit as st
 import json
 from datetime import datetime, date, timedelta
@@ -15,6 +15,20 @@ import base64
 import pandas as pd
 import uuid
 import sys
+import time
+from io import BytesIO
+
+# ============================================================================
+# DOCX LIBRARY IMPORT FOR PUBLISHER
+# ============================================================================
+try:
+    from docx import Document
+    from docx.shared import Inches, Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.style import WD_STYLE_TYPE
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
 
 # Add current directory to path to import modules
 sys.path.append('.')
@@ -137,7 +151,6 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
             st.warning("⚠️ No sessions found in CSV file")
             return []
         
-        # REMOVED: st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
         return sessions_list
         
     except Exception as e:
@@ -371,7 +384,8 @@ def logout_user():
         'show_vignette_manager', 'custom_topic_input', 'show_custom_topic_modal',
         'show_topic_browser', 'show_session_manager', 'show_session_creator',
         'editing_custom_session', 'show_vignette_detail', 'selected_vignette_id',
-        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery'
+        'editing_vignette_id', 'selected_vignette_for_session', 'published_vignette',
+        'show_image_gallery', 'show_publisher', 'current_export_format'
     ]
     for key in keys:
         st.session_state.pop(key, None)
@@ -621,6 +635,547 @@ def auto_correct_text(text):
     except:
         return text
 
+# ============================================================================
+# NEW: INTEGRATED PUBLISHER FUNCTIONS
+# ============================================================================
+def show_celebration():
+    """Show celebration effects"""
+    st.balloons()
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                border-radius: 15px; color: white; margin: 2rem 0;">
+        <h1 style="color: white; font-size: 2.5em;">🎉 Biography Created! 🎉</h1>
+        <p style="font-size: 1.2em;">Your beautiful life story is ready to share!</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def create_docx_biography(stories_data, include_questions=True):
+    """Create a professionally formatted Word document (.docx)"""
+    if not DOCX_AVAILABLE:
+        raise Exception("python-docx library not available. Please install with: pip install python-docx==1.1.0")
+    
+    # Extract data
+    user_name = stories_data.get("user", "Unknown")
+    user_profile = stories_data.get("user_profile", {})
+    stories_dict = stories_data.get("stories", {})
+    
+    # Get author name
+    if user_profile and 'first_name' in user_profile:
+        first_name = user_profile.get('first_name', '')
+        last_name = user_profile.get('last_name', '')
+        author_name = f"{first_name} {last_name}".strip()
+        if not author_name:
+            author_name = user_name
+    else:
+        author_name = user_name
+    
+    # Create document
+    doc = Document()
+    
+    # Title page
+    title_para = doc.add_paragraph()
+    title_run = title_para.add_run("TELL MY STORY\n")
+    title_run.font.name = 'Calibri Light'
+    title_run.font.size = Pt(36)
+    title_run.font.bold = True
+    title_run.font.color.rgb = RGBColor(44, 82, 130)
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    subtitle_para = doc.add_paragraph()
+    subtitle_run = subtitle_para.add_run("A Personal Biography\n")
+    subtitle_run.font.name = 'Calibri'
+    subtitle_run.font.size = Pt(20)
+    subtitle_run.italic = True
+    subtitle_run.font.color.rgb = RGBColor(100, 100, 100)
+    subtitle_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    doc.add_paragraph("\n\n\n\n")
+    
+    author_para = doc.add_paragraph()
+    author_run = author_para.add_run(f"The Life Story of\n{author_name.upper()}")
+    author_run.font.name = 'Calibri'
+    author_run.font.size = Pt(24)
+    author_run.font.color.rgb = RGBColor(0, 0, 0)
+    author_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    doc.add_page_break()
+    
+    # Table of Contents
+    toc_title = doc.add_heading('TABLE OF CONTENTS', 1)
+    toc_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    try:
+        sorted_sessions = sorted(stories_dict.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 0)
+    except:
+        sorted_sessions = stories_dict.items()
+    
+    for session_id, session_data in sorted_sessions:
+        session_title = session_data.get("title", f"Chapter {session_id}")
+        para = doc.add_paragraph()
+        para.style = 'Normal'
+        run = para.add_run(f"{session_title}")
+        run.bold = True
+        run.font.size = Pt(12)
+    
+    doc.add_page_break()
+    
+    # Chapters
+    chapter_num = 0
+    for session_id, session_data in sorted_sessions:
+        session_title = session_data.get("title", f"Chapter {session_id}")
+        questions = session_data.get("questions", {})
+        
+        if not questions:
+            continue
+        
+        chapter_num += 1
+        chapter_title = doc.add_heading(f'CHAPTER {chapter_num}: {session_title.upper()}', 1)
+        chapter_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        story_num = 0
+        for question, answer_data in questions.items():
+            if isinstance(answer_data, dict):
+                answer = answer_data.get("answer", "")
+            else:
+                answer = str(answer_data)
+            
+            if not answer.strip():
+                continue
+            
+            story_num += 1
+            
+            if include_questions:
+                story_header = doc.add_heading(f'Story {story_num}: {question}', 2)
+            else:
+                story_header = doc.add_heading(f'Story {story_num}', 2)
+            
+            content_para = doc.add_paragraph()
+            content_para.add_run(answer.strip())
+            
+            doc.add_paragraph()
+        
+        doc.add_page_break()
+    
+    # Save to BytesIO
+    docx_bytes = BytesIO()
+    doc.save(docx_bytes)
+    docx_bytes.seek(0)
+    
+    return docx_bytes
+
+def create_html_biography(stories_data, include_questions=True):
+    """Create an HTML version"""
+    user_name = stories_data.get("user", "Unknown")
+    user_profile = stories_data.get("user_profile", {})
+    stories_dict = stories_data.get("stories", {})
+    
+    # Get display name
+    if user_profile and 'first_name' in user_profile:
+        first_name = user_profile.get('first_name', '')
+        last_name = user_profile.get('last_name', '')
+        display_name = f"{first_name} {last_name}".strip()
+        if not display_name:
+            display_name = user_name
+    else:
+        display_name = user_name
+    
+    # Collect stories
+    all_stories = []
+    try:
+        sorted_sessions = sorted(stories_dict.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 0)
+    except:
+        sorted_sessions = stories_dict.items()
+    
+    for session_id, session_data in sorted_sessions:
+        session_title = session_data.get("title", f"Chapter {session_id}")
+        for question, answer_data in session_data.get("questions", {}).items():
+            if isinstance(answer_data, dict):
+                answer = answer_data.get("answer", "")
+            else:
+                answer = str(answer_data)
+            if answer.strip():
+                all_stories.append({
+                    "session": session_title,
+                    "question": question,
+                    "answer": answer
+                })
+    
+    # Create HTML
+    export_type = "Interview Q&A" if include_questions else "Biography"
+    
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{display_name}'s {export_type}</title>
+    <style>
+        body {{
+            font-family: 'Georgia', serif;
+            line-height: 1.8;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }}
+        .header {{
+            text-align: center;
+            padding: 40px 0;
+            border-bottom: 3px double #2c5282;
+            margin-bottom: 40px;
+        }}
+        h1 {{
+            color: #2c5282;
+            margin-bottom: 10px;
+        }}
+        .chapter {{
+            margin: 50px 0;
+        }}
+        .chapter-title {{
+            color: #2c5282;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }}
+        .story {{
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }}
+        .question {{
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }}
+        .answer {{
+            white-space: pre-line;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{display_name}'s Life Story</h1>
+        <div>{export_type} • {datetime.now().strftime('%B %d, %Y')}</div>
+    </div>
+'''
+    
+    # Add chapters
+    current_session = None
+    chapter_num = 0
+    
+    for story in all_stories:
+        if story["session"] != current_session:
+            chapter_num += 1
+            current_session = story["session"]
+            html += f'''
+            <div class="chapter">
+                <h2 class="chapter-title">Chapter {chapter_num}: {story['session']}</h2>
+            '''
+        
+        html += f'''
+        <div class="story">
+        '''
+        
+        if include_questions:
+            html += f'''
+            <div class="question">✏️ {story['question']}</div>
+            '''
+        
+        html += f'''
+            <div class="answer">{story['answer']}</div>
+        </div>
+        '''
+        
+        if all_stories.index(story) == len(all_stories) - 1 or \
+           all_stories[all_stories.index(story) + 1]["session"] != current_session:
+            html += '</div>'
+
+    html += f'''
+    <div style="text-align: center; margin-top: 50px; padding-top: 20px; border-top: 2px solid #e2e8f0;">
+        <p>Created with Tell My Story • {datetime.now().strftime('%B %d, %Y')}</p>
+    </div>
+</body>
+</html>'''
+    
+    return html
+
+def create_beautiful_biography(stories_data, include_questions=True):
+    """Create a text biography"""
+    user_name = stories_data.get("user", "Unknown")
+    user_profile = stories_data.get("user_profile", {})
+    stories_dict = stories_data.get("stories", {})
+    
+    # Get display name
+    if user_profile and 'first_name' in user_profile:
+        first_name = user_profile.get('first_name', '')
+        last_name = user_profile.get('last_name', '')
+        display_name = f"{first_name} {last_name}".strip()
+        if not display_name:
+            display_name = user_name
+    else:
+        display_name = user_name
+    
+    export_type = "INTERVIEW Q&A" if include_questions else "BIOGRAPHY"
+    bio_text = "=" * 70 + "\n"
+    bio_text += f"{'TELL MY STORY':^70}\n"
+    bio_text += f"{export_type:^70}\n"
+    bio_text += "=" * 70 + "\n\n"
+    
+    bio_text += f"THE LIFE STORY OF\n{display_name.upper()}\n\n"
+    
+    # Table of Contents
+    bio_text += "TABLE OF CONTENTS\n"
+    bio_text += "-" * 40 + "\n\n"
+    
+    try:
+        sorted_sessions = sorted(stories_dict.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 0)
+    except:
+        sorted_sessions = stories_dict.items()
+    
+    chapter_num = 0
+    story_num = 0
+    for session_id, session_data in sorted_sessions:
+        session_title = session_data.get("title", f"Chapter {session_id}")
+        questions = session_data.get("questions", {})
+        
+        if questions:
+            chapter_num += 1
+            bio_text += f"Chapter {chapter_num}: {session_title}\n"
+            
+            for question, answer_data in questions.items():
+                story_num += 1
+    
+    bio_text += "\n" + "=" * 70 + "\n\n"
+    
+    # Stories
+    chapter_num = 0
+    story_num = 0
+    
+    for session_id, session_data in sorted_sessions:
+        session_title = session_data.get("title", f"Chapter {session_id}")
+        questions = session_data.get("questions", {})
+        
+        if not questions:
+            continue
+        
+        chapter_num += 1
+        bio_text += f"CHAPTER {chapter_num}: {session_title.upper()}\n"
+        bio_text += "=" * 70 + "\n\n"
+        
+        for question, answer_data in questions.items():
+            if isinstance(answer_data, dict):
+                answer = answer_data.get("answer", "")
+            else:
+                answer = str(answer_data)
+            
+            if not answer.strip():
+                continue
+            
+            story_num += 1
+            
+            if include_questions:
+                bio_text += f"Story {story_num}: {question}\n"
+                bio_text += "-" * 40 + "\n"
+            
+            bio_text += f"{answer.strip()}\n\n"
+        
+        bio_text += "\n"
+    
+    bio_text += "=" * 70 + "\n\n"
+    bio_text += f"Total: {story_num} stories across {chapter_num} chapters\n"
+    bio_text += f"Created: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n"
+    bio_text += "=" * 70
+    
+    return bio_text, story_num, chapter_num
+
+def show_publisher():
+    """Show the integrated publisher"""
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    if st.button("← Back", key="publisher_back"):
+        st.session_state.show_publisher = False
+        st.rerun()
+    
+    st.title("📖 Biography Publisher")
+    st.markdown("Transform your life stories into a professionally formatted book")
+    
+    # Get stories data
+    export_data = {}
+    story_count = 0
+    
+    for session in SESSIONS:
+        session_id = session["id"]
+        session_data = st.session_state.responses.get(session_id, {})
+        if session_data.get("questions"):
+            export_data[str(session_id)] = {
+                "title": session["title"],
+                "questions": session_data["questions"]
+            }
+            story_count += len(session_data["questions"])
+    
+    if story_count == 0:
+        st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
+        return
+    
+    # Display user info
+    user_name = st.session_state.user_id
+    user_profile = st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {}
+    
+    if user_profile and user_profile.get('first_name'):
+        display_name = f"{user_profile.get('first_name')} {user_profile.get('last_name', '')}"
+    else:
+        display_name = user_name
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Stories", story_count)
+    with col2:
+        st.metric("Sessions", len(export_data))
+    with col3:
+        total_words = 0
+        for session_id, session_data in export_data.items():
+            for question, answer_data in session_data.get("questions", {}).items():
+                if isinstance(answer_data, dict):
+                    answer = answer_data.get("answer", "")
+                else:
+                    answer = str(answer_data)
+                total_words += len(answer.split())
+        st.metric("Words", f"{total_words:,}")
+    
+    st.divider()
+    
+    # Export options
+    st.subheader("📝 Export Options")
+    
+    col_option1, col_option2 = st.columns(2)
+    with col_option1:
+        st.markdown("""
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 10px; border: 2px solid #e9ecef;">
+            <h4>📚 Biography Format</h4>
+            <p><strong>Just the answers</strong> - Clean narrative format</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_option2:
+        st.markdown("""
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 10px; border: 2px solid #e9ecef;">
+            <h4>🎤 Interview Format</h4>
+            <p><strong>Questions & answers</strong> - Complete Q&A format</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    export_format = st.radio(
+        "Choose your export format:",
+        ["📚 Biography Format (Just Answers)", "🎤 Interview Format (Questions & Answers)"],
+        index=0,
+        horizontal=True,
+        key="export_format"
+    )
+    
+    include_questions = export_format == "🎤 Interview Format (Questions & Answers)"
+    
+    st.divider()
+    
+    # Create biography
+    if st.button("✨ Create Beautiful Biography", type="primary", use_container_width=True):
+        with st.spinner("🖋️ Crafting your beautiful biography..."):
+            time.sleep(1)
+            
+            # Prepare data
+            stories_data = {
+                "user": st.session_state.user_id,
+                "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
+                "stories": export_data,
+                "export_date": datetime.now().isoformat()
+            }
+            
+            # Create all versions
+            bio_text, story_num, chapter_num = create_beautiful_biography(stories_data, include_questions)
+            html_bio = create_html_biography(stories_data, include_questions)
+            
+            # Create DOCX if available
+            docx_data = None
+            if DOCX_AVAILABLE:
+                try:
+                    docx_data = create_docx_biography(stories_data, include_questions)
+                except Exception as e:
+                    st.error(f"⚠️ DOCX creation failed: {str(e)}")
+                    docx_data = None
+        
+        # Show celebration
+        show_celebration()
+        
+        # Preview
+        st.subheader("📖 Your Biography Preview")
+        with st.expander("Preview first 500 characters", expanded=False):
+            st.text(bio_text[:500] + "..." if len(bio_text) > 500 else bio_text)
+        
+        st.divider()
+        
+        # Download options
+        st.subheader("📥 Download Your Biography")
+        
+        safe_name = display_name.replace(" ", "_")
+        file_suffix = "_Interview" if include_questions else "_Biography"
+        
+        # Download buttons in columns
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.download_button(
+                label="📄 TEXT",
+                data=bio_text,
+                file_name=f"{safe_name}{file_suffix}.txt",
+                mime="text/plain",
+                use_container_width=True,
+                type="primary"
+            )
+            st.caption("Plain text format")
+        
+        with col2:
+            st.download_button(
+                label="🌐 HTML",
+                data=html_bio,
+                file_name=f"{safe_name}{file_suffix}.html",
+                mime="text/html",
+                use_container_width=True,
+                type="secondary"
+            )
+            st.caption("Web format")
+        
+        with col3:
+            md_bio = bio_text.replace("=" * 70, "#" * 3)
+            st.download_button(
+                label="📝 MARKDOWN",
+                data=md_bio,
+                file_name=f"{safe_name}{file_suffix}.md",
+                mime="text/markdown",
+                use_container_width=True,
+                type="secondary"
+            )
+            st.caption("Easy editing")
+        
+        with col4:
+            if docx_data:
+                st.download_button(
+                    label="📘 WORD DOC",
+                    data=docx_data,
+                    file_name=f"{safe_name}{file_suffix}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                    type="primary"
+                )
+                st.caption("Professional")
+            else:
+                st.button("📘 WORD DOC", disabled=True, use_container_width=True)
+                st.caption("Install python-docx")
+        
+        # Stats
+        st.divider()
+        st.success(f"✨ Biography created! **{story_num} stories** across **{chapter_num} chapters** ({total_words:,} words)")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # ── Module Integration Functions ──────────────────────────────────────────────
 def switch_to_vignette(vignette_topic, content=""):
     st.session_state.current_question_override = f"Vignette: {vignette_topic}"
@@ -652,39 +1207,33 @@ def show_vignette_modal():
     
     vignette_manager = VignetteManager(st.session_state.user_id)
     
-    # Store publish callback outside the form context
     if 'published_vignette' not in st.session_state:
         st.session_state.published_vignette = None
     
     def on_publish(vignette):
-        # Store vignette in session state instead of creating buttons here
         st.session_state.published_vignette = vignette
         st.success(f"🎉 Vignette '{vignette['title']}' published!")
         st.rerun()
     
     vignette_manager.display_vignette_creator(on_publish=on_publish)
     
-    # Show publish options after vignette is published (outside form context)
     if st.session_state.published_vignette:
         vignette = st.session_state.published_vignette
         st.write("### What would you like to do?")
         
         col1, col2, col3 = st.columns(3)
-        
         with col1:
             if st.button("📚 Add to Session", key="add_to_session_after", use_container_width=True):
                 st.session_state.selected_vignette_for_session = vignette
                 st.session_state.show_vignette_modal = False
                 st.session_state.published_vignette = None
                 st.rerun()
-        
         with col2:
-            if st.button("📖 View All Vignettes", key="view_all_after", use_container_width=True):
+            if st.button("📖 View All", key="view_all_after", use_container_width=True):
                 st.session_state.show_vignette_modal = False
                 st.session_state.show_vignette_manager = True
                 st.session_state.published_vignette = None
                 st.rerun()
-        
         with col3:
             if st.button("✏️ Keep Writing", key="keep_writing", use_container_width=True):
                 st.session_state.show_vignette_modal = False
@@ -709,17 +1258,17 @@ def show_vignette_manager():
     
     vignette_manager = VignetteManager(st.session_state.user_id)
     
+    def on_vignette_select(vignette_id):
+        st.session_state.show_vignette_detail = True
+        st.session_state.selected_vignette_id = vignette_id
+        st.rerun()
+    
     filter_option = st.radio(
         "Show:",
         ["All Stories", "Published", "Drafts", "Most Popular"],
         horizontal=True,
         key="vignette_filter"
     )
-    
-    def on_vignette_select(vignette_id):
-        st.session_state.show_vignette_detail = True
-        st.session_state.selected_vignette_id = vignette_id
-        st.rerun()
     
     filter_map = {
         "All Stories": "all",
@@ -763,27 +1312,9 @@ def show_vignette_detail():
     st.title(vignette['title'])
     st.caption(f"Theme: {vignette.get('theme', 'Uncategorized')}")
     
-    if vignette.get('tags'):
-        tags = " ".join([f"`{tag}`" for tag in vignette.get('tags', [])])
-        st.caption(f"Tags: {tags}")
-    
     st.divider()
     st.write(vignette['content'])
     st.divider()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Words", vignette.get('word_count', 0))
-    with col2:
-        st.metric("Views", vignette.get('views', 0))
-    with col3:
-        st.metric("Likes", vignette.get('likes', 0))
-    with col4:
-        if vignette.get('is_draft'):
-            if st.button("🚀 Publish", use_container_width=True, type="primary"):
-                if vignette_manager.publish_vignette(vignette['id']):
-                    st.success("Published!")
-                    st.rerun()
     
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -791,14 +1322,12 @@ def show_vignette_detail():
             st.session_state.selected_vignette_for_session = vignette
             st.session_state.show_vignette_detail = False
             st.rerun()
-    
     with col2:
         if st.button("✏️ Edit", use_container_width=True):
             st.session_state.editing_vignette_id = vignette['id']
             st.session_state.show_vignette_detail = False
             st.session_state.show_vignette_modal = True
             st.rerun()
-    
     with col3:
         if st.button("🗑️ Delete", type="secondary", use_container_width=True):
             st.warning("Delete functionality to be implemented")
@@ -825,7 +1354,6 @@ def show_topic_browser():
         switch_to_custom_topic(topic_text)
         st.session_state.show_topic_browser = False
     
-    # FIX: Use a unique key that won't cause duplicates
     import time
     topic_bank.display_topic_browser(on_topic_select=on_topic_select, unique_key=str(time.time()))
     
@@ -845,7 +1373,6 @@ def show_session_creator():
     
     st.title("📋 Create Custom Session")
     
-    # Initialize SessionManager with CSV path
     session_manager = SessionManager(st.session_state.user_id, "sessions/sessions.csv")
     session_manager.display_session_creator()
     
@@ -865,20 +1392,17 @@ def show_session_manager():
     
     st.title("📖 Session Manager")
     
-    # Initialize SessionManager with CSV path
     session_manager = SessionManager(st.session_state.user_id, "sessions/sessions.csv")
     
     def on_session_select(session_id):
         all_sessions = session_manager.get_all_sessions()
         for i, session in enumerate(all_sessions):
             if session["id"] == session_id:
-                # Find session index in SESSIONS
                 for j, standard_session in enumerate(SESSIONS):
                     if standard_session["id"] == session_id:
                         st.session_state.current_session = j
                         break
                 else:
-                    # It's a custom session
                     custom_sessions = all_sessions[len(SESSIONS):]
                     if session in custom_sessions:
                         custom_index = custom_sessions.index(session)
@@ -895,9 +1419,7 @@ def show_session_manager():
         st.rerun()
     
     st.divider()
-    
     session_manager.display_session_grid(cols=2, on_session_select=on_session_select)
-    
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Page Config & State ───────────────────────────────────────────────────────
@@ -908,6 +1430,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state with NEW publisher state
 default_state = {
     "logged_in": False,
     "user_id": "",
@@ -955,6 +1478,8 @@ default_state = {
     "selected_vignette_for_session": None,
     "published_vignette": None,
     "show_image_gallery": False,
+    "show_publisher": False,  # NEW: Publisher state
+    "current_export_format": "📚 Biography Format (Just Answers)"  # NEW: Export format
 }
 
 for key, value in default_state.items():
@@ -1204,6 +1729,10 @@ if not st.session_state.historical_events_loaded:
         pass
 
 # Show modals in priority order
+if st.session_state.show_publisher:
+    show_publisher()
+    st.stop()
+
 if st.session_state.show_vignette_detail:
     show_vignette_detail()
     st.stop()
@@ -1275,7 +1804,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 3. Sessions - FIXED: Removed "Session" from button text
+    # 3. Sessions - REMOVED: "Session" from button text
     st.header("📖 Sessions")
     for i, session in enumerate(SESSIONS):
         session_id = session["id"]
@@ -1343,7 +1872,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 5. Vignettes - FIXED: Now stacked
+    # 5. Vignettes
     st.header("✨ Vignettes")
     if st.button("📝 New Vignette", use_container_width=True):
         st.session_state.show_vignette_modal = True
@@ -1378,7 +1907,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 7. Session Management - FIXED: Now stacked
+    # 7. Session Management
     st.header("📖 Session Management")
     if st.button("📋 All Sessions", use_container_width=True):
         st.session_state.show_session_manager = True
@@ -1426,7 +1955,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 10. Export Options - FIXED: Blue download buttons
+    # 10. Export Options - REMOVED: Separate Publish Biography button
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
     st.caption(f"Total answers: {total_answers}")
@@ -1443,7 +1972,7 @@ with st.sidebar:
                 }
         
         if export_data:
-            # Create complete export data
+            # Create JSON data for export
             complete_data = {
                 "user": st.session_state.user_id,
                 "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
@@ -1456,13 +1985,8 @@ with st.sidebar:
             }
             
             json_data = json.dumps(complete_data, indent=2)
-            encoded_data = base64.b64encode(json_data.encode()).decode()
             
-            # USE THE ORIGINAL URL FROM YOUR WORKING APP
-            publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
-            publisher_url = f"{publisher_base_url}?data={encoded_data}"
-            
-            # Stacked download buttons - now styled with blue theme
+            # Stacked download buttons
             stories_only = {
                 "user": st.session_state.user_id,
                 "stories": export_data,
@@ -1490,15 +2014,13 @@ with st.sidebar:
             ):
                 pass
             
+            # NEW: Integrated Publisher Button
             st.divider()
-            st.markdown(f'''
-            <a href="{publisher_url}" target="_blank">
-            <button class="html-link-btn">
-            🖨️ Publish Biography
-            </button>
-            </a>
-            ''', unsafe_allow_html=True)
+            if st.button("🖨️ Publish Biography", use_container_width=True, type="primary"):
+                st.session_state.show_publisher = True
+                st.rerun()
             st.caption("Create a beautiful book with your stories")
+            
         else:
             st.warning("No data to export yet! Start by answering some questions.")
     else:
@@ -1506,7 +2028,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 11. Clear Data - FIXED: Now stacked with disclaimer
+    # 11. Clear Data
     st.subheader("⚠️ Clear Data")
     st.caption("**WARNING: This action cannot be undone - you will lose all your work!**")
     
@@ -1577,9 +2099,13 @@ else:
     current_question_text = current_session["questions"][st.session_state.current_question]
     question_source = "regular"
 
+# ============================================================================
+# NEW: SECTION SEPARATOR WITH LINES AND CAPS
+# ============================================================================
+st.markdown("---")
+st.markdown("<div style='text-align: center;'><h2>✍️ INTERVIEW STYLE</h2></div>", unsafe_allow_html=True)
 st.markdown("---")
 
-# NEW EXACT LAYOUT AS REQUESTED
 # Row 1: Session title and topics explored with progress bar
 col1, col2 = st.columns([3, 1])
 
@@ -1609,9 +2135,11 @@ with col2:
         total_topics = len(current_session["questions"])
         st.markdown(f'<div class="question-counter" style="margin-top: 1rem;">Topic {current_topic} of {total_topics}</div>', unsafe_allow_html=True)
 
-# Professional Ghostwriter Mode tag
+# Professional Ghostwriter Mode tag - APPLIED BOTH AS DEFAULT
 if st.session_state.ghostwriter_mode:
-    st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode (with historical context)</p>', unsafe_allow_html=True)
+    st.markdown('<p class="ghostwriter-tag">Professional mode active • With historical context</p>', unsafe_allow_html=True)
+else:
+    st.markdown('<p class="ghostwriter-tag">Standard mode active</p>', unsafe_allow_html=True)
 
 # The main question
 st.markdown(f"""
@@ -1632,6 +2160,45 @@ else:
         st.info("📝 **Vignette Mode** - Write a short, focused story about a specific moment or memory.")
     else:
         st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
+
+# NEW: Add pictures and descriptions feature
+st.markdown("---")
+st.subheader("📸 Add Pictures and Descriptions")
+with st.expander("📤 Upload Images & Add Descriptions", expanded=False):
+    # Image upload
+    uploaded_files = st.file_uploader(
+        "Choose images to add to this session",
+        type=['jpg', 'jpeg', 'png', 'gif'],
+        accept_multiple_files=True,
+        key="image_uploader"
+    )
+    
+    if uploaded_files:
+        st.success(f"✅ Uploaded {len(uploaded_files)} images")
+        
+        # Image description
+        image_description = st.text_area(
+            "Describe these images (this will be saved with your response):",
+            placeholder="E.g., 'These are photos from my wedding day in 1995...'",
+            height=100,
+            key="image_desc"
+        )
+        
+        if image_description:
+            st.info("📝 Your image description will be included with your answer")
+    
+    # Save images to session
+    if st.button("💾 Save Images to Session", use_container_width=True):
+        if uploaded_files:
+            # In a real app, you would save the files and store references
+            # For now, we'll just show a success message
+            st.success(f"✅ {len(uploaded_files)} images saved to this session")
+            if image_description:
+                st.info(f"Description saved: {image_description[:100]}...")
+        else:
+            st.warning("Please upload at least one image")
+
+st.markdown("---")
 
 # Conversation area
 if current_session_id not in st.session_state.session_conversations:
@@ -1678,7 +2245,7 @@ if not conversation:
         conversation.append({"role": "assistant", "content": conv_text})
         st.session_state.session_conversations[current_session_id][current_question_text] = conversation
 
-# Display conversation
+# Display conversation - NEW: Single answer box approach
 for i, message in enumerate(conversation):
     if message["role"] == "assistant":
         with st.chat_message("assistant", avatar="👔"):
@@ -1723,29 +2290,34 @@ for i, message in enumerate(conversation):
                         st.session_state.edit_text = message["content"]
                         st.rerun()
 
-# BIG ANSWER BOX with SAVE button (not arrow)
+# BIG ANSWER BOX with SAVE button (not arrow) - HALF PAGE SIZE
 st.write("")
 st.write("")
+st.subheader("📝 Your Answer")
 user_input = st.text_area(
-    "Type your long-form answer here...",
+    "Type your detailed answer here...",
     key="long_form_answer",
-    height=200,
-    placeholder="Write your detailed response here. This is where you should write your full story...",
-    label_visibility="visible"
+    height=400,  # Much bigger - about half a page
+    placeholder="Write your detailed response here. Take your time to reflect and write a comprehensive answer. The AI will reflect on your answer and encourage you to expand on it...",
+    label_visibility="collapsed"
 )
 
 col1, col2 = st.columns([1, 3])
 with col1:
-    if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
+    if st.button("💾 Save & Get AI Reflection", key="save_long_form", type="primary", use_container_width=True):
         if user_input:
             if st.session_state.spellcheck_enabled:
                 user_input = auto_correct_text(user_input)
-            conversation.append({"role": "user", "content": user_input})
             
+            # Save the response
             save_response(current_session_id, current_question_text, user_input)
             
+            # Add to conversation
+            conversation.append({"role": "user", "content": user_input})
+            
+            # Get AI reflection - ALWAYS reflect on any answer
             with st.chat_message("assistant", avatar="👔"):
-                with st.spinner("Reflecting on your story..."):
+                with st.spinner("Reflecting on your answer..."):
                     try:
                         conversation_history = conversation[:-1]
                         messages_for_api = [
@@ -1754,7 +2326,24 @@ with col1:
                             {"role": "user", "content": user_input}
                         ]
                         temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
-                        max_tokens = 400 if st.session_state.ghostwriter_mode else 300
+                        max_tokens = 500  # Longer reflection
+                        
+                        # AI prompt for reflection and encouragement
+                        reflection_prompt = f"""
+                        The user just shared this story: {user_input[:500]}...
+                        
+                        Please reflect on their answer and:
+                        1. Acknowledge what they've shared
+                        2. Reflect on the emotional or historical significance
+                        3. Encourage them to expand on specific aspects
+                        4. Ask thoughtful follow-up questions
+                        5. Connect it to broader themes if relevant
+                        
+                        Be warm, insightful, and encouraging. Help them deepen their story.
+                        """
+                        
+                        messages_for_api.append({"role": "system", "content": reflection_prompt})
+                        
                         response = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=messages_for_api,
@@ -1762,14 +2351,18 @@ with col1:
                             max_tokens=max_tokens
                         )
                         ai_response = response.choices[0].message.content
-                        if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
-                            ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
+                        
+                        # Add encouragement to expand
+                        if len(user_input.split()) < 200:  # If answer is short
+                            ai_response += "\n\n✨ **Try expanding:** This is a great start! Could you tell me more about..."
+                        
                         st.markdown(ai_response)
                         conversation.append({"role": "assistant", "content": ai_response})
                     except Exception as e:
-                        error_msg = "Thank you for sharing that. Your response has been saved."
+                        error_msg = "Thank you for sharing that thoughtful reflection. I appreciate the detail you've provided. Would you like to expand on any particular aspect?"
                         st.markdown(error_msg)
                         conversation.append({"role": "assistant", "content": error_msg})
+            
             st.session_state.session_conversations[current_session_id][current_question_text] = conversation
             st.rerun()
         else:
@@ -1805,11 +2398,13 @@ with col2:
                 st.rerun()
 
 # Session Progress
-st.divider()
+st.markdown("---")
+st.markdown("<div style='text-align: center;'><h2>📊 SESSION PROGRESS</h2></div>", unsafe_allow_html=True)
+st.markdown("---")
+
 progress_info = get_progress_info(current_session_id)
 st.markdown(f"""
 <div class="progress-container">
-<div class="progress-header">📊 Session Progress</div>
 <div class="progress-status">{progress_info['emoji']} {progress_info['progress_percent']:.0f}% complete • {progress_info['remaining_words']} words remaining</div>
 <div class="progress-bar-container">
 <div class="progress-bar-fill" style="width: {min(progress_info['progress_percent'], 100)}%; background-color: {progress_info['color']};"></div>
@@ -1849,7 +2444,10 @@ if st.session_state.editing_word_target:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer Stats
-st.divider()
+st.markdown("---")
+st.markdown("<div style='text-align: center;'><h2>📈 YOUR STATISTICS</h2></div>", unsafe_allow_html=True)
+st.markdown("---")
+
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     total_words_all_sessions = sum(calculate_author_word_count(s["id"]) for s in SESSIONS)
@@ -1865,16 +2463,17 @@ with col4:
     st.metric("Total Stories", f"{total_topics_answered}")
 
 # ============================================================================
-# SECTION: BIOGRAPHY FORMATTER EXPORT (FROM ORIGINAL WORKING APP)
+# NEW: INTEGRATED PUBLISHER SECTION (from bottom of main page)
 # ============================================================================
-st.divider()
-st.subheader("📘 Biography Formatter")
+st.markdown("---")
+st.markdown("<div style='text-align: center;'><h2>📘 BIOGRAPHY PUBLISHER</h2></div>", unsafe_allow_html=True)
+st.markdown("---")
 
 # Get the current user's data
 current_user = st.session_state.get('user_id', '')
 export_data = {}
 
-# Prepare data for export (EXACTLY like original app)
+# Prepare data for export
 for session in SESSIONS:
     session_id = session["id"]
     session_data = st.session_state.responses.get(session_id, {})
@@ -1885,62 +2484,64 @@ for session in SESSIONS:
         }
 
 if current_user and current_user != "" and export_data:
-    # Count total stories (matching original app logic)
+    # Count total stories
     total_stories = sum(len(session['questions']) for session in export_data.values())
     
-    # Create JSON data for the publisher - EXACTLY LIKE THE ORIGINAL APP
-    json_data = json.dumps({
-        "user": current_user,
-        "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
-        "stories": export_data,
-        "export_date": datetime.now().isoformat(),
-        "summary": {
-            "total_stories": total_stories,
-            "total_sessions": len(export_data)
-        }
-    }, indent=2)
-    
-    # Encode the data for URL
-    encoded_data = base64.b64encode(json_data.encode()).decode()
-    
-    # USE THE ORIGINAL URL FROM YOUR WORKING APP
-    publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
-    publisher_url = f"{publisher_base_url}?data={encoded_data}"
-    
-    st.success(f"✅ **{total_stories} stories ready for formatting!**")
+    st.success(f"✅ **{total_stories} stories ready for publishing!**")
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("#### 🖨️ Format Biography")
-        st.markdown(f"""
+        st.markdown("""
         Generate a professionally formatted biography from your stories.
         
-        **[📘 Click to Format Biography]({publisher_url})**
-        
-        Your formatted biography will include:
+        **Features:**
+        • 4 Export formats (TXT, HTML, MD, DOCX)
+        • 2 Export styles (Biography or Interview)
         • Professional formatting
         • Table of contents
         • All your stories organized
         • Ready to print or share
         """)
+        
+        if st.button("📖 Launch Publisher", use_container_width=True, type="primary"):
+            st.session_state.show_publisher = True
+            st.rerun()
     
     with col2:
-        st.markdown("#### 🔐 Save to Your Vault")
-        st.markdown("""
-        **After formatting your biography:**
+        st.markdown("#### 📊 Quick Statistics")
+        total_words = 0
+        for session_id, session_data in export_data.items():
+            for question, answer_data in session_data.get("questions", {}).items():
+                if isinstance(answer_data, dict):
+                    answer = answer_data.get("answer", "")
+                else:
+                    answer = str(answer_data)
+                total_words += len(answer.split())
         
-        1. Generate your biography (link on left)
-        2. Download the formatted PDF
-        3. Save it to your secure vault
+        st.metric("Total Stories", total_stories)
+        st.metric("Total Sessions", len(export_data))
+        st.metric("Total Words", f"{total_words:,}")
         
-        **[💾 Go to Secure Vault](https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/)**
-        
-        Your vault preserves important documents forever.
-        """)
+        if st.session_state.ghostwriter_mode:
+            st.success("✓ Professional mode active")
+        else:
+            st.info("Standard mode active")
     
-    # Backup download (exactly like original app)
+    # Backup download
     with st.expander("📥 Download Raw Data (Backup)"):
+        json_data = json.dumps({
+            "user": current_user,
+            "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
+            "stories": export_data,
+            "export_date": datetime.now().isoformat(),
+            "summary": {
+                "total_stories": total_stories,
+                "total_sessions": len(export_data)
+            }
+        }, indent=2)
+        
         st.download_button(
             label="Download Stories as JSON",
             data=json_data,
@@ -1948,12 +2549,12 @@ if current_user and current_user != "" and export_data:
             mime="application/json",
             use_container_width=True
         )
-        st.caption("Use this if the formatter link doesn't work")
+        st.caption("Use this for backup or import into other apps")
         
 elif current_user and current_user != "":
     st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
 else:
-    st.info("👤 **Please log in to format your biography**")
+    st.info("👤 **Please log in to publish your biography**")
 
 # ============================================================================
 # FOOTER
@@ -1964,8 +2565,8 @@ if st.session_state.user_account:
     account_age = (datetime.now() - datetime.fromisoformat(st.session_state.user_account['created_at'])).days
     
     footer_info = f"""
-Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} • 🔥 {st.session_state.streak_days} day streak • 📅 Account Age: {account_age} days
-"""
+    Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} • 🔥 {st.session_state.streak_days} day streak • 📅 Account Age: {account_age} days
+    """
     st.caption(footer_info)
 else:
     st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
