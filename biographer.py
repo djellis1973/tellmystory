@@ -588,6 +588,10 @@ def save_response(session_id, question, answer, answer_index=None):
         answer_key = f"{question}_answer_{next_index}"
         answer_index = next_index
     
+    # FIX: Apply spellcheck BEFORE saving the response
+    if st.session_state.spellcheck_enabled:
+        answer = auto_correct_text(answer)
+    
     st.session_state.responses[session_id]["questions"][answer_key] = {
         "answer": answer,
         "question": question,  # Store the original question
@@ -1562,9 +1566,8 @@ with st.sidebar:
     st.caption(f"Total answers: {total_answers}")
     
     if st.session_state.logged_in and st.session_state.user_id:
-        # FIXED: Prepare data in the EXACT format the publisher expects
-        export_data = []
-        story_index = 1
+        # FIXED: Prepare data in the EXACT format the publisher expects - DICTIONARY FORMAT
+        export_data = {}
         
         for session in SESSIONS:
             session_id = session["id"]
@@ -1583,32 +1586,27 @@ with st.sidebar:
                         "answer_index": answer_data.get("answer_index", 1)
                     })
                 
-                # Add each answer as a separate story entry for the publisher
-                for question_text, answers in questions_dict.items():
-                    for answer_data in answers:
-                        export_data.append({
-                            "question": question_text,
-                            "answer": answer_data["answer"],
-                            "timestamp": answer_data["timestamp"],
-                            "answer_index": answer_data.get("answer_index", 1),
-                            "session_id": session_id,
-                            "session_title": session["title"]
-                        })
-                        story_index += 1
+                export_data[str(session_id)] = {
+                    "title": session["title"],
+                    "questions": questions_dict
+                }
         
         if export_data:
-            # Count total stories
-            total_stories = len(export_data)
+            # Count total answers for summary
+            total_stories = 0
+            for session_data in export_data.values():
+                for question_answers in session_data["questions"].values():
+                    total_stories += len(question_answers)
             
-            # Create complete export data in the EXACT format publisher expects
+            # Create complete export data in the DICTIONARY format publisher expects
             complete_data = {
                 "user": st.session_state.user_id,
                 "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
-                "stories": export_data,  # This is now a LIST, not a dict
+                "stories": export_data,  # This is now a DICT, not a list
                 "export_date": datetime.now().isoformat(),
                 "summary": {
                     "total_stories": total_stories,
-                    "total_sessions": len(set(s['session_id'] for s in export_data))
+                    "total_sessions": len(export_data)
                 }
             }
             
@@ -1896,6 +1894,7 @@ for i, message in enumerate(conversation):
                     col1, col2, col3 = st.columns([1, 1, 1])
                     with col1:
                         if st.button("✓ Save", key=f"save_{current_session_id}_{hash(current_question_text)}_{i}", type="primary", use_container_width=True):
+                            # FIX: Apply spellcheck BEFORE saving when editing
                             if st.session_state.spellcheck_enabled:
                                 new_text = auto_correct_text(new_text)
                             conversation[i]["content"] = new_text
@@ -1954,9 +1953,8 @@ col1, col2 = st.columns([1, 3])
 with col1:
     if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
         if user_input:
-            if st.session_state.spellcheck_enabled:
-                user_input = auto_correct_text(user_input)
-            
+            # FIX: Apply spellcheck BEFORE saving (moved to save_response function)
+            # The spellcheck is now applied in save_response() function
             # Determine answer index
             next_answer_index = len(all_answers_for_question) + 1
             
@@ -2113,38 +2111,47 @@ st.subheader("📘 Biography Formatter")
 
 # Get the current user's data
 current_user = st.session_state.get('user_id', '')
-export_data = []
+export_data = {}
 
-# Prepare data for export (LIST FORMAT for publisher)
+# Prepare data for export (DICTIONARY FORMAT for publisher)
 for session in SESSIONS:
     session_id = session["id"]
     session_data = st.session_state.responses.get(session_id, {})
     if session_data.get("questions"):
+        # Group answers by question
+        questions_dict = {}
         for answer_key, answer_data in session_data["questions"].items():
             question_text = answer_data.get("question", answer_key.split('_answer_')[0] if '_answer_' in answer_key else answer_key)
+            if question_text not in questions_dict:
+                questions_dict[question_text] = []
             
-            export_data.append({
-                "question": question_text,
+            questions_dict[question_text].append({
                 "answer": answer_data["answer"],
                 "timestamp": answer_data["timestamp"],
-                "answer_index": answer_data.get("answer_index", 1),
-                "session_id": session_id,
-                "session_title": session["title"]
+                "answer_index": answer_data.get("answer_index", 1)
             })
+        
+        export_data[str(session_id)] = {
+            "title": session["title"],
+            "questions": questions_dict
+        }
 
 if current_user and current_user != "" and export_data:
-    # Count total stories
-    total_stories = len(export_data)
+    # Count total answers (including multiple answers per question)
+    total_stories = 0
+    for session_data in export_data.values():
+        for question_answers in session_data["questions"].values():
+            total_stories += len(question_answers)
     
-    # Create JSON data for the publisher in the CORRECT FORMAT
+    # Create JSON data for the publisher in the CORRECT DICTIONARY FORMAT
     json_data = json.dumps({
         "user": current_user,
         "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
-        "stories": export_data,  # LIST format, not dict
+        "stories": export_data,  # DICTIONARY format
         "export_date": datetime.now().isoformat(),
         "summary": {
             "total_stories": total_stories,
-            "total_sessions": len(set(s['session_id'] for s in export_data))
+            "total_sessions": len(export_data)
         }
     }, indent=2)
     
@@ -2217,4 +2224,3 @@ Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} �
     st.caption(footer_info)
 else:
     st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
-
