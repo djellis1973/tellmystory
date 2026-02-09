@@ -1,7 +1,5 @@
 /* styles.css - tellmystory styling - BLUE/GREEN THEME */
 
-/* Add these styles to your existing styles.css file */
-
 /* Section separator with caps */
 .section-separator {
     text-align: center;
@@ -192,25 +190,11 @@
     color: #3498db;
 }
 
-/* ============================================================================
-   HIDE STREAMLIT DEFAULT TITLES - FIXED TO SHOW SIDEBAR
-   ============================================================================ */
-
-/* Hide only page titles and main headers, NOT sidebar elements */
-h1,
-.st-emotion-cache-10trblm,
-header[data-testid="stHeader"],
-div[data-testid="stDecoration"] {
+/* Simple hide for Streamlit headers - NO sidebar hiding */
+[data-testid="stHeader"] {
     display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
 }
 
-/* REMOVED: .st-emotion-cache-1v0mbdj - This was hiding sidebar elements */
-
-/* Adjust main app container */
 .stApp {
     margin-top: -2rem !important;
 }
