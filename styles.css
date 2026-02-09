@@ -190,15 +190,16 @@
     font-size: 2.5em;
     margin-bottom: 0.5rem;
     color: #3498db;
-}/* ============================================================================
-   HIDE STREAMLIT DEFAULT TITLES - ADD TO TOP OF styles.css
+}
+
+/* ============================================================================
+   HIDE STREAMLIT DEFAULT TITLES - FIXED TO SHOW SIDEBAR
    ============================================================================ */
 
-/* Hide ALL page titles and headers */
+/* Hide only page titles and main headers, NOT sidebar elements */
 h1,
 .st-emotion-cache-10trblm,
 header[data-testid="stHeader"],
-.st-emotion-cache-1v0mbdj,
 div[data-testid="stDecoration"] {
     display: none !important;
     visibility: hidden !important;
@@ -206,6 +207,8 @@ div[data-testid="stDecoration"] {
     margin: 0 !important;
     padding: 0 !important;
 }
+
+/* REMOVED: .st-emotion-cache-1v0mbdj - This was hiding sidebar elements */
 
 /* Adjust main app container */
 .stApp {
