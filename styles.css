@@ -1,26 +1,4 @@
 /* styles.css - tellmystory styling - BLUE/GREEN THEME */
-/* ============================================================================
-   REMOVE STREAMLIT SIDEBAR NAVIGATION ONLY
-   ============================================================================ */
-
-/* Hide the navigation/app switcher section at the top of sidebar */
-section[data-testid="stSidebar"] > div:first-child > div:first-child,
-div[data-testid="stSidebarNav"],
-[data-testid="stSidebarUserContent"] {
-    display: none !important;
-}
-
-/* Ensure YOUR sidebar content remains visible */
-section[data-testid="stSidebar"] > div:first-child > div:nth-child(2) {
-    display: block !important;
-}
-
-/* Specifically target the "You" and "Apps" sections */
-div[class*="sidebar-nav"],
-nav[class*="sidebar"],
-div[class*="stSidebarNav"] {
-    display: none !important;
-}
 
 /* Add these styles to your existing styles.css file */
 
