@@ -137,7 +137,7 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
             st.warning("⚠️ No sessions found in CSV file")
             return []
         
-        st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
+        # REMOVED: st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
         return sessions_list
         
     except Exception as e:
@@ -1237,31 +1237,21 @@ st.markdown(f"""
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
+    # Add "Tell My Story" header at top of sidebar
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 0; margin-bottom: 1rem; border-bottom: 2px solid #b5f5ec;">
+        <h2 style="color: #0066cc; margin: 0;">Tell My Story</h2>
+        <p style="color: #36cfc9; font-size: 0.9rem; margin: 0.25rem 0 0 0;">Your Life Timeline</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 1. Your Profile
     st.header("👤 Your Profile")
     if st.session_state.user_account:
         profile = st.session_state.user_account['profile']
         st.success(f"✓ **{profile['first_name']} {profile['last_name']}**")
-        
-        # ONLY show these - no email
-        if profile.get('birthdate'):
-            st.caption(f"🎂 Born: {profile['birthdate']}")
-        
-        # Historical events with green checkmark
-        if profile.get('birthdate'):
-            try:
-                birth_year = int(profile['birthdate'].split(', ')[-1])
-                events = get_events_for_birth_year(birth_year)
-                if events:
-                    uk_events = [e for e in events if e.get('region') == 'UK']
-                    global_events = len(events) - len(uk_events)
-                    st.success(f"✓ {len(events)} historical events ({len(uk_events)} UK, {global_events} global)")
-            except:
-                pass
-        
-        account_type = st.session_state.user_account['account_type']
-        st.caption(f"👤 Account: {account_type.title()}")
     
-    # Full width buttons
+    # Full width buttons (stacked)
     if st.button("📝 Edit Profile", use_container_width=True):
         st.session_state.show_profile_setup = True
         st.rerun()
@@ -1271,8 +1261,8 @@ with st.sidebar:
     
     st.divider()
     
-    # Writing Streak - UPDATED
-    st.subheader("🔥 Writing Streak")
+    # 2. Writing Streak
+    st.header("🔥 Writing Streak")
     streak_emoji = get_streak_emoji(st.session_state.streak_days)
     st.markdown(f"<div class='streak-flame'>{streak_emoji}</div>", unsafe_allow_html=True)
     st.markdown(f"**{st.session_state.streak_days} day streak**")
@@ -1285,42 +1275,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Quick Capture - UPDATED
-    st.subheader("⚡ Quick Capture")
-    with st.expander("💭 Jot Now - Quick Memory", expanded=False):
-        quick_note = st.text_area(
-            "Got a memory? Jot it down:",
-            value="",
-            height=120,
-            placeholder="E.g., 'That summer at grandma's house in 1995...'",
-            key="jot_text_area",
-            label_visibility="collapsed"
-        )
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("💾 Save Jot", key="save_jot_btn", use_container_width=True):
-                if quick_note and quick_note.strip():
-                    estimated_year = estimate_year_from_text(quick_note)
-                    save_jot(quick_note, estimated_year)
-                    st.success("Saved! ✨")
-                    st.rerun()
-                else:
-                    st.warning("Please write something first!")
-        with col2:
-            use_disabled = not quick_note or not quick_note.strip()
-            if st.button("📝 Use as Prompt", key="use_jot_btn", use_container_width=True, disabled=use_disabled):
-                st.session_state.current_question_override = quick_note
-                st.info("Ready to write about this!")
-                st.rerun()
-        if st.session_state.get('quick_jots'):
-            st.caption(f"📝 {len(st.session_state.quick_jots)} quick notes saved")
-            if st.button("View Quick Notes", key="view_jots_btn", use_container_width=True):
-                st.session_state.show_jots = True
-                st.rerun()
-    
-    st.divider()
-    
-    # Sessions - UPDATED with traffic light system
+    # 3. Sessions - FIXED: Removed "Session" from button text
     st.header("📖 Sessions")
     for i, session in enumerate(SESSIONS):
         session_id = session["id"]
@@ -1339,7 +1294,9 @@ with st.sidebar:
         if i == st.session_state.current_session:
             status = "▶️"  # Current session
         
-        button_text = f"{status} Session {session_id}: {session['title']}"
+        # REMOVED "Session" from button text
+        button_text = f"{status} {session_id}: {session['title']}"
+        
         if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
             st.session_state.current_session = i
             st.session_state.current_question = 0
@@ -1350,7 +1307,98 @@ with st.sidebar:
     
     st.divider()
     
-    # Interview Style - UPDATED
+    # 4. Quick Capture
+    st.header("⚡ Quick Capture")
+    with st.expander("💭 Jot Now - Quick Memory", expanded=False):
+        quick_note = st.text_area(
+            "Got a memory? Jot it down:",
+            value="",
+            height=120,
+            placeholder="E.g., 'That summer at grandma's house in 1995...'",
+            key="jot_text_area",
+            label_visibility="collapsed"
+        )
+        
+        # Stacked buttons inside expander
+        if st.button("💾 Save Jot", key="save_jot_btn", use_container_width=True):
+            if quick_note and quick_note.strip():
+                estimated_year = estimate_year_from_text(quick_note)
+                save_jot(quick_note, estimated_year)
+                st.success("Saved! ✨")
+                st.rerun()
+            else:
+                st.warning("Please write something first!")
+        
+        use_disabled = not quick_note or not quick_note.strip()
+        if st.button("📝 Use as Prompt", key="use_jot_btn", use_container_width=True, disabled=use_disabled):
+            st.session_state.current_question_override = quick_note
+            st.info("Ready to write about this!")
+            st.rerun()
+            
+        if st.session_state.get('quick_jots'):
+            st.caption(f"📝 {len(st.session_state.quick_jots)} quick notes saved")
+            if st.button("View Quick Notes", key="view_jots_btn", use_container_width=True):
+                st.session_state.show_jots = True
+                st.rerun()
+    
+    st.divider()
+    
+    # 5. Vignettes - FIXED: Now stacked
+    st.header("✨ Vignettes")
+    if st.button("📝 New Vignette", use_container_width=True):
+        st.session_state.show_vignette_modal = True
+        st.rerun()
+    
+    if st.button("📖 View All", use_container_width=True):
+        st.session_state.show_vignette_manager = True
+        st.rerun()
+    
+    st.divider()
+    
+    # 6. Historical Context
+    st.header("📜 Historical Context")
+    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
+        try:
+            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
+            events = get_events_for_birth_year(birth_year)
+            if events:
+                st.caption(f"From {birth_year} to present")
+                
+                with st.expander("View Sample Events", expanded=False):
+                    for i, event in enumerate(events[:5]):
+                        region_emoji = "🇬🇧" if event.get('region') == 'UK' else "🌍"
+                        st.markdown(f"**{region_emoji} {event['event']}**")
+                        st.caption(f"{event['year_range']} • {event.get('category', 'General')}")
+                        if i < 4:
+                            st.divider()
+        except:
+            st.info("Add birthdate to see historical context")
+    else:
+        st.info("Add your birthdate to enable historical context")
+    
+    st.divider()
+    
+    # 7. Session Management - FIXED: Now stacked
+    st.header("📖 Session Management")
+    if st.button("📋 All Sessions", use_container_width=True):
+        st.session_state.show_session_manager = True
+        st.rerun()
+    
+    if st.button("➕ Custom Session", use_container_width=True):
+        st.session_state.show_session_creator = True
+        st.rerun()
+    
+    st.divider()
+    
+    # 8. Topic Management
+    st.header("📚 Topic Management")
+    if st.button("🔍 Browse Topics", use_container_width=True):
+        st.session_state.show_topic_browser = True
+        st.rerun()
+    
+    st.divider()
+    
+    # 9. Interview Style
     st.header("✍️ Interview Style")
     ghostwriter_mode = st.toggle(
         "Professional Ghostwriter Mode",
@@ -1378,66 +1426,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Historical Context - UPDATED with green checkmark
-    st.header("📜 Historical Context")
-    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
-        try:
-            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
-            events = get_events_for_birth_year(birth_year)
-            if events:
-                st.success(f"✓ {len(events)} historical events loaded")
-                st.caption(f"From {birth_year} to present")
-                with st.expander("View Sample Events", expanded=False):
-                    for i, event in enumerate(events[:5]):
-                        region_emoji = "🇬🇧" if event.get('region') == 'UK' else "🌍"
-                        st.markdown(f"**{region_emoji} {event['event']}**")
-                        st.caption(f"{event['year_range']} • {event.get('category', 'General')}")
-                        if i < 4:
-                            st.divider()
-        except:
-            st.info("Add birthdate to see historical context")
-    else:
-        st.info("Add your birthdate to enable historical context")
-    
-    st.divider()
-    
-    # Vignettes - UPDATED
-    st.header("✨ Vignettes")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📝 New Vignette", use_container_width=True):
-            st.session_state.show_vignette_modal = True
-            st.rerun()
-    with col2:
-        if st.button("📖 View All", use_container_width=True):
-            st.session_state.show_vignette_manager = True
-            st.rerun()
-    
-    st.divider()
-    
-    # Session Management - UPDATED
-    st.header("📖 Session Management")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📋 All Sessions", use_container_width=True):
-            st.session_state.show_session_manager = True
-            st.rerun()
-    with col2:
-        if st.button("➕ Custom Session", use_container_width=True):
-            st.session_state.show_session_creator = True
-            st.rerun()
-    
-    st.divider()
-    
-    # Topic Management - UPDATED
-    st.header("📚 Topic Management")
-    if st.button("🔍 Browse Topics", use_container_width=True):
-        st.session_state.show_topic_browser = True
-        st.rerun()
-    
-    st.divider()
-    
-    # Export Options
+    # 10. Export Options - FIXED: Blue download buttons
     st.subheader("📤 Export Options")
     total_answers = sum(len(session.get("questions", {})) for session in st.session_state.responses.values())
     st.caption(f"Total answers: {total_answers}")
@@ -1473,31 +1462,33 @@ with st.sidebar:
             publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
             publisher_url = f"{publisher_base_url}?data={encoded_data}"
             
-            col1, col2 = st.columns(2)
-            with col1:
-                stories_only = {
-                    "user": st.session_state.user_id,
-                    "stories": export_data,
-                    "export_date": datetime.now().isoformat()
-                }
-                stories_json = json.dumps(stories_only, indent=2)
-                st.download_button(
-                    label="📥 Stories Only",
-                    data=stories_json,
-                    file_name=f"Tell_My_Story_Stories_{st.session_state.user_id}.json",
-                    mime="application/json",
-                    use_container_width=True,
-                    key="download_stories_btn"
-                )
-            with col2:
-                st.download_button(
-                    label="📊 Complete Data",
-                    data=json_data,
-                    file_name=f"Tell_My_Story_Complete_{st.session_state.user_id}.json",
-                    mime="application/json",
-                    use_container_width=True,
-                    key="download_complete_btn"
-                )
+            # Stacked download buttons - now styled with blue theme
+            stories_only = {
+                "user": st.session_state.user_id,
+                "stories": export_data,
+                "export_date": datetime.now().isoformat()
+            }
+            stories_json = json.dumps(stories_only, indent=2)
+            
+            if st.download_button(
+                label="📥 Stories Only",
+                data=stories_json,
+                file_name=f"Tell_My_Story_Stories_{st.session_state.user_id}.json",
+                mime="application/json",
+                use_container_width=True,
+                key="download_stories_btn"
+            ):
+                pass
+            
+            if st.download_button(
+                label="📊 Complete Data",
+                data=json_data,
+                file_name=f"Tell_My_Story_Complete_{st.session_state.user_id}.json",
+                mime="application/json",
+                use_container_width=True,
+                key="download_complete_btn"
+            ):
+                pass
             
             st.divider()
             st.markdown(f'''
@@ -1515,57 +1506,58 @@ with st.sidebar:
     
     st.divider()
     
-    # Clear Data - UPDATED
+    # 11. Clear Data - FIXED: Now stacked with disclaimer
     st.subheader("⚠️ Clear Data")
+    st.caption("**WARNING: This action cannot be undone - you will lose all your work!**")
+    
     if st.session_state.confirming_clear == "session":
         st.markdown('<div class="warning-box">', unsafe_allow_html=True)
         st.warning("**WARNING: This will delete ALL answers in the current session!**")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("✅ Confirm Delete Session", type="primary", use_container_width=True, key="confirm_delete_session"):
-                current_session_id = SESSIONS[st.session_state.current_session]["id"]
-                try:
-                    st.session_state.responses[current_session_id]["questions"] = {}
-                    save_user_data(st.session_state.user_id, st.session_state.responses)
-                    st.session_state.confirming_clear = None
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-        with col2:
-            if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_session"):
+        
+        if st.button("✅ Confirm Delete Session", type="primary", use_container_width=True, key="confirm_delete_session"):
+            current_session_id = SESSIONS[st.session_state.current_session]["id"]
+            try:
+                st.session_state.responses[current_session_id]["questions"] = {}
+                save_user_data(st.session_state.user_id, st.session_state.responses)
                 st.session_state.confirming_clear = None
                 st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
+        
+        if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_session"):
+            st.session_state.confirming_clear = None
+            st.rerun()
+            
         st.markdown('</div>', unsafe_allow_html=True)
     elif st.session_state.confirming_clear == "all":
         st.markdown('<div class="warning-box">', unsafe_allow_html=True)
         st.warning("**WARNING: This will delete ALL answers for ALL sessions!**")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("✅ Confirm Delete All", type="primary", use_container_width=True, key="confirm_delete_all"):
-                try:
-                    for session in SESSIONS:
-                        session_id = session["id"]
-                        st.session_state.responses[session_id]["questions"] = {}
-                    save_user_data(st.session_state.user_id, st.session_state.responses)
-                    st.session_state.confirming_clear = None
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-        with col2:
-            if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_all"):
+        
+        if st.button("✅ Confirm Delete All", type="primary", use_container_width=True, key="confirm_delete_all"):
+            try:
+                for session in SESSIONS:
+                    session_id = session["id"]
+                    st.session_state.responses[session_id]["questions"] = {}
+                save_user_data(st.session_state.user_id, st.session_state.responses)
                 st.session_state.confirming_clear = None
                 st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
+        
+        if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_all"):
+            st.session_state.confirming_clear = None
+            st.rerun()
+            
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🗑️ Clear Session", type="secondary", use_container_width=True, key="clear_session_btn"):
-                st.session_state.confirming_clear = "session"
-                st.rerun()
-        with col2:
-            if st.button("🔥 Clear All", type="secondary", use_container_width=True, key="clear_all_btn"):
-                st.session_state.confirming_clear = "all"
-                st.rerun()
+        # Stacked clear buttons
+        if st.button("🗑️ Clear Session", type="secondary", use_container_width=True, key="clear_session_btn"):
+            st.session_state.confirming_clear = "session"
+            st.rerun()
+        
+        if st.button("🔥 Clear All", type="secondary", use_container_width=True, key="clear_all_btn"):
+            st.session_state.confirming_clear = "all"
+            st.rerun()
 
 # ── Main Content Area ─────────────────────────────────────────────────────────
 # Check if we have a valid current session
@@ -1977,3 +1969,4 @@ Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} �
     st.caption(footer_info)
 else:
     st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
+
