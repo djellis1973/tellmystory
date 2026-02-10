@@ -19,13 +19,15 @@ import sys
 # Add current directory to path to import modules
 sys.path.append('.')
 
-# Import ALL modules (with try-except)
+# Import ALL modules
 try:
     from topic_bank import TopicBank
     from session_manager import SessionManager
     from vignettes import VignetteManager
 except ImportError as e:
-    # Silently handle import errors
+    st.error(f"Error importing modules: {e}")
+    st.info("Please ensure all .py files are in the same directory")
+    # Set to None if import fails
     TopicBank = None
     SessionManager = None
     VignetteManager = None
@@ -33,50 +35,21 @@ except ImportError as e:
 DEFAULT_WORD_TARGET = 500
 
 # ── OpenAI client ─────────────────────────────────────────────────────────────
-client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", "")))
+client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY")))
 
 # ── Load external CSS ─────────────────────────────────────────────────────────
 try:
     with open("styles.css", encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 except FileNotFoundError:
-    # Default minimal CSS if styles.css not found
-    st.markdown("""
-    <style>
-    .main-header { text-align: center; margin-bottom: 2rem; }
-    .logo-img { max-height: 100px; }
-    .question-box { 
-        background-color: #e8f4f8; 
-        border-left: 4px solid #3498db; 
-        padding: 15px; 
-        margin: 15px 0; 
-        border-radius: 5px;
-        font-size: 1.2rem;
-    }
-    .answer-display-box {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 10px;
-        padding: 20px;
-        margin: 10px 0;
-        white-space: pre-line;
-    }
-    .warning-box {
-        background-color: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 5px;
-        padding: 15px;
-        margin: 10px 0;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    st.warning("styles.css not found – layout may look broken")
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo.png"
 
-# ── Sessions (ONLY FROM CSV) ─────────────────────────────────────────────────
+# ── Sessions (ONLY FROM CSV - NO HARDCODING) ─────────────────────────────────
 def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
-    """Load sessions ONLY from CSV file"""
+    """Load sessions ONLY from CSV file - NO hardcoded fallback"""
     try:
         import pandas as pd
         import os
@@ -85,18 +58,18 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
         os.makedirs(os.path.dirname(csv_path) if os.path.dirname(csv_path) else '.', exist_ok=True)
         
         if not os.path.exists(csv_path):
-            # Create a default sessions file if it doesn't exist
-            default_sessions = [
-                ['session_id', 'title', 'guidance', 'question', 'word_target'],
-                [1, 'Childhood', 'Welcome to Session 1', 'What is your earliest memory?', 500],
-                [1, 'Childhood', '', 'Can you describe your family home?', 500],
-                [2, 'School Days', 'Welcome to Session 2', 'What was your favorite subject in school?', 500],
-                [2, 'School Days', '', 'Who was your favorite teacher?', 500]
-            ]
+            # CSV doesn't exist - show error and return empty list
+            st.error(f"❌ Sessions CSV file not found: {csv_path}")
+            st.info("""
+            Please create a `sessions/sessions.csv` file with this format:
             
-            df = pd.DataFrame(default_sessions[1:], columns=default_sessions[0])
-            df.to_csv(csv_path, index=False)
-            st.info(f"Created default sessions file at {csv_path}")
+            session_id,title,guidance,question,word_target
+            1,Childhood,"Welcome to Session 1...","What is your earliest memory?",500
+            1,Childhood,,"Can you describe your family home?",500
+            
+            Guidance only needs to be in the first row of each session.
+            """)
+            return []
         
         df = pd.read_csv(csv_path)
         
@@ -105,6 +78,7 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             st.error(f"❌ Missing required columns in CSV: {missing_columns}")
+            st.info("CSV must have at least: session_id, question")
             return []
         
         # Group by session_id
@@ -159,6 +133,11 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
         sessions_list = list(sessions_dict.values())
         sessions_list.sort(key=lambda x: x['id'])
         
+        if not sessions_list:
+            st.warning("⚠️ No sessions found in CSV file")
+            return []
+        
+        # REMOVED: st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
         return sessions_list
         
     except Exception as e:
@@ -168,31 +147,88 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
 # Load sessions ONCE at startup
 SESSIONS = load_sessions_from_csv()
 
-# ── Authentication Functions (Simplified) ────────────────────────────────────
+# ── Historical events – CSV only ──────────────────────────────────────────────
+def create_default_events_csv():
+    if not os.path.exists("historical_events.csv"):
+        with open("historical_events.csv", "w", encoding="utf-8") as f:
+            f.write("year_range,event,category,region,description\n")
+
+def load_historical_events():
+    create_default_events_csv()
+    try:
+        df = pd.read_csv("historical_events.csv")
+        events_by_decade = {}
+        for _, row in df.iterrows():
+            decade = str(row['year_range']).strip()
+            events_by_decade.setdefault(decade, []).append(row.to_dict())
+        return events_by_decade
+    except:
+        return {}
+
+def get_events_for_birth_year(birth_year):
+    events_by_decade = load_historical_events()
+    relevant = []
+    start_decade = (birth_year // 10) * 10
+    current_year = datetime.now().year
+    for decade in range(start_decade, current_year + 10, 10):
+        key = f"{decade}s"
+        if key in events_by_decade:
+            for ev in events_by_decade[key]:
+                approx_year = int(key.replace('s', '')) + 5
+                age = approx_year - birth_year
+                if age >= 0:
+                    ev_copy = ev.copy()
+                    ev_copy['approx_age'] = age
+                    relevant.append(ev_copy)
+    relevant.sort(key=lambda x: x.get('year_range', '9999'))
+    return relevant[:20]
+
+# ── Email Configuration ───────────────────────────────────────────────────────
+EMAIL_CONFIG = {
+    "smtp_server": st.secrets.get("SMTP_SERVER", "smtp.gmail.com"),
+    "smtp_port": int(st.secrets.get("SMTP_PORT", 587)),
+    "sender_email": st.secrets.get("SENDER_EMAIL", ""),
+    "sender_password": st.secrets.get("SENDER_PASSWORD", ""),
+    "use_tls": True
+}
+
+# ── Authentication Functions ──────────────────────────────────────────────────
+def generate_password(length=12):
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(stored_hash, password):
+    return stored_hash == hash_password(password)
 
 def create_user_account(user_data, password=None):
     try:
         user_id = hashlib.sha256(f"{user_data['email']}{datetime.now().isoformat()}".encode()).hexdigest()[:12]
         if not password:
-            alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-            password = ''.join(secrets.choice(alphabet) for _ in range(12))
-        
+            password = generate_password()
         user_record = {
             "user_id": user_id,
             "email": user_data["email"].lower().strip(),
             "password_hash": hash_password(password),
-            "account_type": "self",
+            "account_type": user_data.get("account_for", "self"),
             "created_at": datetime.now().isoformat(),
             "last_login": datetime.now().isoformat(),
             "profile": {
                 "first_name": user_data["first_name"],
                 "last_name": user_data["last_name"],
                 "email": user_data["email"],
-                "gender": "",
-                "birthdate": "",
-                "timeline_start": ""
+                "gender": user_data.get("gender", ""),
+                "birthdate": user_data.get("birthdate", ""),
+                "timeline_start": user_data.get("birthdate", "")
+            },
+            "settings": {
+                "email_notifications": True,
+                "auto_save": True,
+                "privacy_level": "private",
+                "theme": "light",
+                "email_verified": False
             },
             "stats": {
                 "total_sessions": 0,
@@ -203,43 +239,144 @@ def create_user_account(user_data, password=None):
                 "last_active": datetime.now().isoformat()
             }
         }
-        
-        # Save account
-        os.makedirs("accounts", exist_ok=True)
-        filename = f"accounts/{user_id}_account.json"
-        with open(filename, 'w') as f:
-            json.dump(user_record, f, indent=2)
-        
+        save_account_data(user_record)
         return {"success": True, "user_id": user_id, "password": password, "user_record": user_record}
     except Exception as e:
         print(f"Error creating account: {e}")
         return {"success": False, "error": str(e)}
 
+def save_account_data(user_record):
+    try:
+        os.makedirs("accounts", exist_ok=True)
+        filename = f"accounts/{user_record['user_id']}_account.json"
+        json.dump(user_record, open(filename, 'w'), indent=2)
+        update_accounts_index(user_record)
+        return True
+    except Exception as e:
+        print(f"Error saving account: {e}")
+        return False
+
+def update_accounts_index(user_record):
+    try:
+        index_file = "accounts/accounts_index.json"
+        os.makedirs("accounts", exist_ok=True)
+        index = json.load(open(index_file, 'r')) if os.path.exists(index_file) else {}
+        index[user_record['user_id']] = {
+            "email": user_record['email'],
+            "first_name": user_record['profile']['first_name'],
+            "last_name": user_record['profile']['last_name'],
+            "created_at": user_record['created_at'],
+            "account_type": user_record['account_type']
+        }
+        json.dump(index, open(index_file, 'w'), indent=2)
+        return True
+    except Exception as e:
+        print(f"Error updating index: {e}")
+        return False
+
+def get_account_data(user_id=None, email=None):
+    try:
+        os.makedirs("accounts", exist_ok=True)
+        if user_id:
+            filename = f"accounts/{user_id}_account.json"
+            if os.path.exists(filename):
+                return json.load(open(filename, 'r'))
+        if email:
+            email = email.lower().strip()
+            index_file = "accounts/accounts_index.json"
+            if os.path.exists(index_file):
+                index = json.load(open(index_file, 'r'))
+                for uid, data in index.items():
+                    if data.get("email", "").lower() == email:
+                        filename = f"accounts/{uid}_account.json"
+                        if os.path.exists(filename):
+                            return json.load(open(filename, 'r'))
+    except Exception as e:
+        print(f"Error loading account: {e}")
+    return None
+
 def authenticate_user(email, password):
     try:
-        email = email.lower().strip()
-        
-        # Look for account file
-        os.makedirs("accounts", exist_ok=True)
-        accounts_dir = "accounts"
-        
-        for filename in os.listdir(accounts_dir):
-            if filename.endswith("_account.json"):
-                filepath = os.path.join(accounts_dir, filename)
-                with open(filepath, 'r') as f:
-                    account = json.load(f)
-                
-                if account.get('email', '').lower() == email:
-                    if account['password_hash'] == hash_password(password):
-                        # Update last login
-                        account['last_login'] = datetime.now().isoformat()
-                        with open(filepath, 'w') as f:
-                            json.dump(account, f, indent=2)
-                        return {"success": True, "user_id": account['user_id'], "user_record": account}
-        
+        account = get_account_data(email=email)
+        if account and verify_password(account['password_hash'], password):
+            account['last_login'] = datetime.now().isoformat()
+            save_account_data(account)
+            return {"success": True, "user_id": account['user_id'], "user_record": account}
         return {"success": False, "error": "Invalid email or password"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+def send_welcome_email(user_data, credentials):
+    try:
+        if not EMAIL_CONFIG['sender_email'] or not EMAIL_CONFIG['sender_password']:
+            print("Email not configured")
+            return False
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_CONFIG['sender_email']
+        msg['To'] = user_data['email']
+        msg['Subject'] = "Welcome to Tell My Story - Your Account Details"
+        body = f"""
+        <html>
+        <body style="font-family: Arial; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #2c3e50;">Welcome to Tell My Story, {user_data['first_name']}!</h2>
+            <p>Thank you for creating your account.</p>
+            <div style="background-color: #f8f9fa; border-left: 4px solid #3498db; padding: 15px; margin: 20px 0;">
+                <h3 style="color: #2c3e50; margin-top: 0;">Your Account Details:</h3>
+                <p><strong>Account ID:</strong> {credentials['user_id']}</p>
+                <p><strong>Email:</strong> {user_data['email']}</p>
+                <p><strong>Password:</strong> {credentials['password']}</p>
+            </div>
+            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4 style="color: #2c3e50; margin-top: 0;">Getting Started:</h4>
+                <ol>
+                    <li>Log in with your email and password</li>
+                    <li>Start building your timeline from your birthdate: {user_data.get('birthdate', 'Not specified')}</li>
+                    <li>Add memories, photos, and stories to your timeline</li>
+                    <li>Share with family and friends</li>
+                </ol>
+            </div>
+            <p>Your Tell My Story timeline starts from your birthdate and grows with you as you add more memories and milestones.</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="#" style="background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Start Your Journey</a>
+            </div>
+            <p style="color: #7f8c8d; font-size: 0.9em; border-top: 1px solid #eee; padding-top: 20px;">
+                If you didn't create this account, please ignore this email or contact support.<br>
+                This is an automated message, please do not reply directly.
+            </p>
+        </div>
+        </body>
+        </html>
+        """
+        msg.attach(MIMEText(body, 'html'))
+        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
+            if EMAIL_CONFIG['use_tls']:
+                server.starttls()
+            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
+            server.send_message(msg)
+        print(f"Welcome email sent to {user_data['email']}")
+        return True
+    except Exception as e:
+        print(f"Error sending welcome email: {e}")
+        return False
+
+def logout_user():
+    keys = [
+        'user_id', 'user_account', 'logged_in', 'show_profile_setup',
+        'current_session', 'current_question', 'responses',
+        'session_conversations', 'data_loaded', 'show_image_upload',
+        'selected_images_for_prompt', 'image_prompt_mode',
+        'show_vignette_modal', 'vignette_topic', 'vignette_content',
+        'selected_vignette_type', 'current_vignette_list', 'editing_vignette_index',
+        'show_vignette_manager', 'custom_topic_input', 'show_custom_topic_modal',
+        'show_topic_browser', 'show_session_manager', 'show_session_creator',
+        'editing_custom_session', 'show_vignette_detail', 'selected_vignette_id',
+        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery'
+    ]
+    for key in keys:
+        st.session_state.pop(key, None)
+    st.query_params.clear()
+    st.rerun()
 
 # ── Storage & Streak ──────────────────────────────────────────────────────────
 def get_user_filename(user_id):
@@ -275,12 +412,136 @@ def save_user_data(user_id, responses_data):
         print(f"Error saving user data for {user_id}: {e}")
         return False
 
-# ── Core Functions for SINGLE ANSWER BOX ─────────────────────────────────────
-def save_response_single(session_id, question, answer, answer_index=1):
-    """Save a single response."""
+def update_streak():
+    if "streak_days" not in st.session_state:
+        st.session_state.streak_days = 1
+    if "last_active" not in st.session_state:
+        st.session_state.last_active = date.today().isoformat()
+    if "total_writing_days" not in st.session_state:
+        st.session_state.total_writing_days = 1
+    today = date.today().isoformat()
+    if st.session_state.last_active != today:
+        try:
+            last_date = date.fromisoformat(st.session_state.last_active)
+            today_date = date.today()
+            days_diff = (today_date - last_date).days
+            if days_diff == 1:
+                st.session_state.streak_days += 1
+            elif days_diff > 1:
+                st.session_state.streak_days = 1
+            st.session_state.total_writing_days += 1
+            st.session_state.last_active = today
+        except:
+            st.session_state.last_active = today
+
+def get_streak_emoji(streak_days):
+    if streak_days >= 30:
+        return "🔥🔥🔥"
+    elif streak_days >= 7:
+        return "🔥🔥"
+    elif streak_days >= 3:
+        return "🔥"
+    else:
+        return "✨"
+
+def estimate_year_from_text(text):
+    try:
+        years = re.findall(r'\b(19\d{2}|20\d{2})\b', text)
+        if years:
+            return int(years[0])
+    except:
+        pass
+    return None
+
+def save_jot(text, estimated_year=None):
+    if "quick_jots" not in st.session_state:
+        st.session_state.quick_jots = []
+    jot_data = {
+        "text": text,
+        "year": estimated_year,
+        "date": datetime.now().isoformat(),
+        "word_count": len(re.findall(r'\w+', text))
+    }
+    st.session_state.quick_jots.append(jot_data)
+    return True
+
+# ── Prompt Builder ────────────────────────────────────────────────────────────
+def get_system_prompt():
+    # Check if we have sessions loaded
+    if not SESSIONS or st.session_state.current_session >= len(SESSIONS):
+        return "No sessions available. Please check your CSV file."
+    
+    current_session = SESSIONS[st.session_state.current_session]
+    current_question = (
+        st.session_state.current_question_override
+        or current_session["questions"][st.session_state.current_question]
+    )
+    historical_context = ""
+    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
+        try:
+            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
+            events = get_events_for_birth_year(birth_year)
+            if events:
+                context_lines = []
+                for event in events[:5]:
+                    event_text = f"- {event['event']} ({event['year_range']})"
+                    if event.get('region') == 'UK':
+                        event_text += " [UK]"
+                    if 'approx_age' in event and event['approx_age'] >= 0:
+                        event_text += f" (Age {event['approx_age']})"
+                    context_lines.append(event_text)
+                historical_context = f"""
+HISTORICAL CONTEXT (Born {birth_year}):
+During their lifetime, these major events occurred:
+{chr(10).join(context_lines)}
+Consider how these historical moments might have shaped their experiences and perspectives.
+"""
+        except Exception as e:
+            print(f"Error generating historical context: {e}")
+    
+    if st.session_state.ghostwriter_mode:
+        return f"""ROLE: You are a senior literary biographer with multiple award-winning books to your name.
+CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
+CURRENT TOPIC: "{current_question}"
+{historical_context}
+YOUR APPROACH:
+1. Listen like an archivist
+2. Think in scenes, sensory details, and emotional truth
+3. Connect personal stories to historical context when relevant
+4. Find the story that needs to be told
+
+Tone: Literary but not pretentious. Serious but not solemn."""
+    else:
+        return f"""You are a warm, professional biographer helping document a life story.
+CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
+CURRENT TOPIC: "{current_question}"
+{historical_context}
+
+Tone: Kind, curious, professional"""
+
+# ── Core Functions (FIXED VERSION FOR MULTIPLE ANSWERS) ──────────────────────
+def save_response(session_id, question, answer, answer_index=None):
+    """Save a response. If answer_index is None, auto-increment to allow multiple answers."""
     user_id = st.session_state.user_id
     if not user_id or user_id == "":
         return False
+    
+    update_streak()
+    
+    if st.session_state.user_account:
+        word_count = len(re.findall(r'\w+', answer))
+        if "stats" not in st.session_state.user_account:
+            st.session_state.user_account["stats"] = {}
+        st.session_state.user_account["stats"]["total_words"] = st.session_state.user_account["stats"].get("total_words", 0) + word_count
+        
+        # Count total answers across all sessions
+        total_answers = 0
+        for sid, session_data in st.session_state.responses.items():
+            total_answers += len(session_data.get("questions", {}))
+        
+        st.session_state.user_account["stats"]["total_sessions"] = total_answers
+        st.session_state.user_account["stats"]["last_active"] = datetime.now().isoformat()
+        save_account_data(st.session_state.user_account)
     
     if session_id not in st.session_state.responses:
         # Find the session in SESSIONS
@@ -306,20 +567,38 @@ def save_response_single(session_id, question, answer, answer_index=1):
         }
     
     # Generate a unique key for this answer
-    answer_key = f"{question}_answer_{answer_index}"
+    if answer_index is not None:
+        # Use provided answer index
+        answer_key = f"{question}_answer_{answer_index}"
+    else:
+        # Check if this question already has answers
+        existing_answers = []
+        for key in st.session_state.responses[session_id]["questions"].keys():
+            if question in key and key.startswith(f"{question}_answer_"):
+                try:
+                    idx = int(key.split('_answer_')[1])
+                    existing_answers.append(idx)
+                except:
+                    continue
+        
+        if existing_answers:
+            next_index = max(existing_answers) + 1
+        else:
+            next_index = 1
+        answer_key = f"{question}_answer_{next_index}"
+        answer_index = next_index
     
-    # Save the answer
     st.session_state.responses[session_id]["questions"][answer_key] = {
         "answer": answer,
-        "question": question,
+        "question": question,  # Store the original question
         "timestamp": datetime.now().isoformat(),
         "answer_index": answer_index
     }
     
     return save_user_data(user_id, st.session_state.responses)
 
-def delete_response_single(session_id, question, answer_index=1):
-    """Delete a specific response"""
+def delete_response(session_id, question, answer_index):
+    """Delete a specific response by its answer_index"""
     user_id = st.session_state.user_id
     if not user_id or user_id == "":
         return False
@@ -331,82 +610,459 @@ def delete_response_single(session_id, question, answer_index=1):
             # Remove from responses
             del st.session_state.responses[session_id]["questions"][answer_key]
             
+            # Clean up conversation
+            if session_id in st.session_state.session_conversations:
+                if question in st.session_state.session_conversations[session_id]:
+                    # Find and remove the conversation entry for this answer
+                    conversation = st.session_state.session_conversations[session_id][question]
+                    # We need to find which conversation entries correspond to this answer
+                    # This is tricky because conversation entries don't store answer_index
+                    # We'll just rebuild the conversation from remaining answers
+                    rebuild_conversation_from_answers(session_id, question)
+            
             # Save changes
             return save_user_data(user_id, st.session_state.responses)
     
     return False
 
-def get_response_single(session_id, question, answer_index=1):
-    """Get a specific response"""
-    answer_key = f"{question}_answer_{answer_index}"
+def rebuild_conversation_from_answers(session_id, question):
+    """Rebuild conversation from remaining answers"""
+    if session_id not in st.session_state.session_conversations:
+        st.session_state.session_conversations[session_id] = {}
     
-    if session_id in st.session_state.responses:
-        if answer_key in st.session_state.responses[session_id]["questions"]:
-            return st.session_state.responses[session_id]["questions"][answer_key]
+    # Start with welcome message
+    welcome_msg = f"""Let's explore this topic in detail: {question}\n\n"""
+    if st.session_state.current_question_override and st.session_state.current_question_override.startswith("Vignette:"):
+        welcome_msg += "📝 Vignette Mode: Write a short, focused story about this specific moment or memory."
+    elif st.session_state.current_question_override:
+        welcome_msg += "✨ Custom Topic: Write about whatever comes to mind!"
+    else:
+        welcome_msg += "Take your time with this—good biographies are built from thoughtful reflection."
     
-    return None
+    conversation = [{"role": "assistant", "content": welcome_msg}]
+    
+    # Add remaining answers
+    session_data = st.session_state.responses.get(session_id, {})
+    for answer_key, answer_data in session_data.get("questions", {}).items():
+        if "question" in answer_data and answer_data["question"] == question:
+            conversation.append({
+                "role": "user",
+                "content": answer_data["answer"],
+                "answer_index": answer_data.get("answer_index", 1)
+            })
+            # Add AI response placeholder
+            conversation.append({
+                "role": "assistant",
+                "content": f"Thank you for sharing this perspective. You can add more memories about this topic."
+            })
+        elif question in answer_key and '_answer_' in answer_key:
+            # For backward compatibility
+            try:
+                answer_index = int(answer_key.split('_answer_')[1]) if '_answer_' in answer_key else 1
+                conversation.append({
+                    "role": "user",
+                    "content": answer_data["answer"],
+                    "answer_index": answer_index
+                })
+                # Add AI response placeholder
+                conversation.append({
+                    "role": "assistant",
+                    "content": f"Thank you for sharing this perspective. You can add more memories about this topic."
+                })
+            except:
+                pass
+    
+    st.session_state.session_conversations[session_id][question] = conversation
 
-# ── Enhanced auto-correct ────────────────────────────────────────────────────
-def auto_correct_text_enhanced(text, force_correction=False):
-    """Enhanced auto-correct that preserves paragraphs and formatting"""
-    if not text or not text.strip():
-        return text
+def calculate_author_word_count(session_id):
+    total_words = 0
+    session_data = st.session_state.responses.get(session_id, {})
+    for answer_key, answer_data in session_data.get("questions", {}).items():
+        if answer_data.get("answer"):
+            total_words += len(re.findall(r'\w+', answer_data["answer"]))
+    return total_words
+
+def get_progress_info(session_id):
+    current_count = calculate_author_word_count(session_id)
+    target = st.session_state.responses[session_id].get("word_target", DEFAULT_WORD_TARGET)
+    if target == 0:
+        progress_percent = 100
+        emoji = "🟢"
+        color = "#27ae60"
+    else:
+        progress_percent = (current_count / target) * 100 if target > 0 else 100
+    if progress_percent >= 100:
+        emoji = "🟢"
+        color = "#27ae60"
+    elif progress_percent >= 70:
+        emoji = "🟡"
+        color = "#f39c12"
+    else:
+        emoji = "🔴"
+        color = "#e74c3c"
+    remaining_words = max(0, target - current_count)
+    status_text = f"{remaining_words} words remaining" if remaining_words > 0 else "Target achieved!"
+    return {
+        "current_count": current_count,
+        "target": target,
+        "progress_percent": progress_percent,
+        "emoji": emoji,
+        "color": color,
+        "remaining_words": remaining_words,
+        "status_text": status_text
+    }
     
-    # If spellcheck is disabled and not forced, return original
-    if not st.session_state.spellcheck_enabled and not force_correction:
+def auto_correct_text(text):
+    if not text or not st.session_state.spellcheck_enabled:
         return text
-    
     try:
-        # Check if OpenAI client is available
-        if not client.api_key:
-            return text
-            
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {
-                    "role": "system", 
-                    "content": """Fix spelling and grammar mistakes in the following text. 
-                    Preserve ALL paragraph breaks, line breaks, and formatting exactly as written.
-                    Keep the original structure and organization.
-                    Return only the corrected text with exactly the same paragraph structure."""
-                },
+                {"role": "system", "content": "Fix spelling and grammar mistakes in the following text. Return only the corrected text."},
                 {"role": "user", "content": text}
             ],
-            max_tokens=len(text) + 200,
+            max_tokens=len(text) + 100,
             temperature=0.1
         )
-        corrected_text = response.choices[0].message.content.strip()
-        
-        # If the corrected text is empty or very different, return original
-        if not corrected_text or len(corrected_text) < len(text) * 0.5:
-            return text
-        
-        return corrected_text
-    except Exception as e:
-        print(f"Error in auto-correct: {e}")
+        return response.choices[0].message.content
+    except:
         return text
 
-# ── Page State ───────────────────────────────────────────────────────────────
+# ── Module Integration Functions ──────────────────────────────────────────────
+def switch_to_vignette(vignette_topic, content=""):
+    st.session_state.current_question_override = f"Vignette: {vignette_topic}"
+    st.session_state.image_prompt_mode = False
+    if content:
+        current_session = SESSIONS[st.session_state.current_session]
+        current_session_id = current_session["id"]
+        save_response(current_session_id, f"Vignette: {vignette_topic}", content)
+    st.rerun()
+
+def switch_to_custom_topic(topic_text):
+    st.session_state.current_question_override = topic_text
+    st.session_state.image_prompt_mode = False
+    st.rerun()
+
+def show_vignette_modal():
+    if not VignetteManager:
+        st.error("Vignette module not available")
+        st.session_state.show_vignette_modal = False
+        return
+    
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    if st.button("← Back", key="vignette_modal_back"):
+        st.session_state.show_vignette_modal = False
+        if 'editing_vignette_id' in st.session_state:
+            st.session_state.pop('editing_vignette_id')
+        st.rerun()
+    
+    vignette_manager = VignetteManager(st.session_state.user_id)
+    
+    # Store publish callback outside the form context
+    if 'published_vignette' not in st.session_state:
+        st.session_state.published_vignette = None
+    
+    def on_publish(vignette):
+        # Store vignette in session state instead of creating buttons here
+        st.session_state.published_vignette = vignette
+        st.success(f"🎉 Vignette '{vignette['title']}' published!")
+        st.rerun()
+    
+    vignette_manager.display_vignette_creator(on_publish=on_publish)
+    
+    # Show publish options after vignette is published (outside form context)
+    if st.session_state.published_vignette:
+        vignette = st.session_state.published_vignette
+        st.write("### What would you like to do?")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("📚 Add to Session", key="add_to_session_after", use_container_width=True):
+                st.session_state.selected_vignette_for_session = vignette
+                st.session_state.show_vignette_modal = False
+                st.session_state.published_vignette = None
+                st.rerun()
+        
+        with col2:
+            if st.button("📖 View All Vignettes", key="view_all_after", use_container_width=True):
+                st.session_state.show_vignette_modal = False
+                st.session_state.show_vignette_manager = True
+                st.session_state.published_vignette = None
+                st.rerun()
+        
+        with col3:
+            if st.button("✏️ Keep Writing", key="keep_writing", use_container_width=True):
+                st.session_state.show_vignette_modal = False
+                st.session_state.published_vignette = None
+                st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def show_vignette_manager():
+    if not VignetteManager:
+        st.error("Vignette module not available")
+        st.session_state.show_vignette_manager = False
+        return
+    
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    if st.button("← Back", key="vignette_manager_back"):
+        st.session_state.show_vignette_manager = False
+        st.rerun()
+    
+    st.title("📚 Your Vignettes")
+    
+    vignette_manager = VignetteManager(st.session_state.user_id)
+    
+    filter_option = st.radio(
+        "Show:",
+        ["All Stories", "Published", "Drafts", "Most Popular"],
+        horizontal=True,
+        key="vignette_filter"
+    )
+    
+    def on_vignette_select(vignette_id):
+        st.session_state.show_vignette_detail = True
+        st.session_state.selected_vignette_id = vignette_id
+        st.rerun()
+    
+    filter_map = {
+        "All Stories": "all",
+        "Published": "published",
+        "Drafts": "drafts",
+        "Most Popular": "popular"
+    }
+    
+    vignette_manager.display_vignette_gallery(
+        filter_by=filter_map.get(filter_option, "all"),
+        on_select=on_vignette_select
+    )
+    
+    st.divider()
+    if st.button("➕ Create New Vignette", type="primary", use_container_width=True):
+        st.session_state.show_vignette_manager = False
+        st.session_state.show_vignette_modal = True
+        st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def show_vignette_detail():
+    if not VignetteManager or not st.session_state.get('selected_vignette_id'):
+        st.session_state.show_vignette_detail = False
+        return
+    
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    if st.button("← Back", key="vignette_detail_back"):
+        st.session_state.show_vignette_detail = False
+        st.rerun()
+    
+    vignette_manager = VignetteManager(st.session_state.user_id)
+    vignette = vignette_manager.get_vignette_by_id(st.session_state.selected_vignette_id)
+    
+    if not vignette:
+        st.error("Vignette not found")
+        st.session_state.show_vignette_detail = False
+        return
+    
+    st.title(vignette['title'])
+    st.caption(f"Theme: {vignette.get('theme', 'Uncategorized')}")
+    
+    if vignette.get('tags'):
+        tags = " ".join([f"`{tag}`" for tag in vignette.get('tags', [])])
+        st.caption(f"Tags: {tags}")
+    
+    st.divider()
+    st.write(vignette['content'])
+    st.divider()
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Words", vignette.get('word_count', 0))
+    with col2:
+        st.metric("Views", vignette.get('views', 0))
+    with col3:
+        st.metric("Likes", vignette.get('likes', 0))
+    with col4:
+        if vignette.get('is_draft'):
+            if st.button("🚀 Publish", use_container_width=True, type="primary"):
+                if vignette_manager.publish_vignette(vignette['id']):
+                    st.success("Published!")
+                    st.rerun()
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("📚 Add to Session", type="primary", use_container_width=True):
+            st.session_state.selected_vignette_for_session = vignette
+            st.session_state.show_vignette_detail = False
+            st.rerun()
+    
+    with col2:
+        if st.button("✏️ Edit", use_container_width=True):
+            st.session_state.editing_vignette_id = vignette['id']
+            st.session_state.show_vignette_detail = False
+            st.session_state.show_vignette_modal = True
+            st.rerun()
+    
+    with col3:
+        if st.button("🗑️ Delete", type="secondary", use_container_width=True):
+            st.warning("Delete functionality to be implemented")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def show_topic_browser():
+    if not TopicBank:
+        st.error("Topic module not available")
+        st.session_state.show_topic_browser = False
+        return
+    
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    if st.button("← Back", key="topic_browser_back"):
+        st.session_state.show_topic_browser = False
+        st.rerun()
+    
+    st.title("📚 Topic Browser")
+    
+    topic_bank = TopicBank(st.session_state.user_id)
+    
+    def on_topic_select(topic_text):
+        switch_to_custom_topic(topic_text)
+        st.session_state.show_topic_browser = False
+    
+    # FIX: Use a unique key that won't cause duplicates
+    import time
+    topic_bank.display_topic_browser(on_topic_select=on_topic_select, unique_key=str(time.time()))
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def show_session_creator():
+    if not SessionManager:
+        st.error("Session module not available")
+        st.session_state.show_session_creator = False
+        return
+    
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    if st.button("← Back", key="session_creator_back"):
+        st.session_state.show_session_creator = False
+        st.rerun()
+    
+    st.title("📋 Create Custom Session")
+    
+    # Initialize SessionManager with CSV path
+    session_manager = SessionManager(st.session_state.user_id, "sessions/sessions.csv")
+    session_manager.display_session_creator()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def show_session_manager():
+    if not SessionManager:
+        st.error("Session module not available")
+        st.session_state.show_session_manager = False
+        return
+    
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    if st.button("← Back", key="session_manager_back"):
+        st.session_state.show_session_manager = False
+        st.rerun()
+    
+    st.title("📖 Session Manager")
+    
+    # Initialize SessionManager with CSV path
+    session_manager = SessionManager(st.session_state.user_id, "sessions/sessions.csv")
+    
+    def on_session_select(session_id):
+        all_sessions = session_manager.get_all_sessions()
+        for i, session in enumerate(all_sessions):
+            if session["id"] == session_id:
+                # Find session index in SESSIONS
+                for j, standard_session in enumerate(SESSIONS):
+                    if standard_session["id"] == session_id:
+                        st.session_state.current_session = j
+                        break
+                else:
+                    # It's a custom session
+                    custom_sessions = all_sessions[len(SESSIONS):]
+                    if session in custom_sessions:
+                        custom_index = custom_sessions.index(session)
+                        st.session_state.current_session = len(SESSIONS) + custom_index
+                
+                st.session_state.current_question = 0
+                st.session_state.current_question_override = None
+                st.rerun()
+                break
+    
+    if st.button("➕ Create New Session", type="primary", use_container_width=True):
+        st.session_state.show_session_manager = False
+        st.session_state.show_session_creator = True
+        st.rerun()
+    
+    st.divider()
+    
+    session_manager.display_session_grid(cols=2, on_session_select=on_session_select)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Page Config & State ───────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Tell My Story - Your Life Timeline",
+    page_icon="📖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 default_state = {
     "logged_in": False,
     "user_id": "",
     "user_account": None,
+    "show_profile_setup": False,
     "current_session": 0,
     "current_question": 0,
     "responses": {},
-    "current_question_override": None,
-    "ghostwriter_mode": True,
-    "spellcheck_enabled": True,
+    "session_conversations": {},
     "editing": None,
     "edit_text": "",
+    "ghostwriter_mode": True,
+    "spellcheck_enabled": True,
+    "editing_word_target": False,
     "confirming_clear": None,
     "data_loaded": False,
-    # State for single answer mode
-    "current_answer": "",
-    "force_correction": False,
-    "correction_applied": False,
-    "original_text": "",
+    "current_question_override": None,
+    "quick_jots": [],
+    "current_jot": "",
+    "show_jots": False,
+    "historical_events_loaded": False,
+    "show_image_upload": False,
+    "image_prompt_mode": False,
+    "selected_images_for_prompt": [],
+    "image_description": "",
+    "streak_days": 1,
+    "last_active": date.today().isoformat(),
+    "total_writing_days": 1,
+    "show_vignette_modal": False,
+    "vignette_topic": "",
+    "vignette_content": "",
+    "selected_vignette_type": "Standard Topic",
+    "current_vignette_list": [],
+    "editing_vignette_index": None,
+    "show_vignette_manager": False,
+    "custom_topic_input": "",
+    "show_custom_topic_modal": False,
+    "show_topic_browser": False,
+    "show_session_manager": False,
+    "show_session_creator": False,
+    "editing_custom_session": None,
+    "show_vignette_detail": False,
+    "selected_vignette_id": None,
+    "editing_vignette_id": None,
+    "selected_vignette_for_session": None,
+    "published_vignette": None,
+    "show_image_gallery": False,
 }
 
 for key, value in default_state.items():
@@ -425,18 +1081,21 @@ if SESSIONS:
                 "completed": False,
                 "word_target": session.get("word_target", DEFAULT_WORD_TARGET)
             }
+        if session_id not in st.session_state.session_conversations:
+            st.session_state.session_conversations[session_id] = {}
 
-# Load user data if logged in
 if st.session_state.logged_in and st.session_state.user_id and not st.session_state.data_loaded:
     user_data = load_user_data(st.session_state.user_id)
     if "responses" in user_data:
-        # Merge loaded responses
+        # Clear any existing responses first to prevent old answers from persisting
         for session_id_str, session_data in user_data["responses"].items():
             try:
                 session_id = int(session_id_str)
                 if session_id in st.session_state.responses:
                     if "questions" in session_data:
-                        st.session_state.responses[session_id]["questions"] = session_data["questions"]
+                        # Only load if we have valid data
+                        if session_data["questions"]:
+                            st.session_state.responses[session_id]["questions"] = session_data["questions"]
             except ValueError:
                 continue
     st.session_state.data_loaded = True
@@ -444,9 +1103,9 @@ if st.session_state.logged_in and st.session_state.user_id and not st.session_st
 # ── Authentication Components ─────────────────────────────────────────────────
 def show_login_signup():
     st.markdown("""
-    <div style="text-align: center; padding: 3rem 0;">
-        <h1>Tell My Story</h1>
-        <p style="color: #666;">Your Life Timeline • Preserve Your Legacy</p>
+    <div class="auth-container">
+    <h1 class="auth-title">Tell My Story</h1>
+    <p class="auth-subtitle">Your Life Timeline • Preserve Your Legacy</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -477,7 +1136,11 @@ def show_login_form():
         st.subheader("Welcome Back")
         email = st.text_input("Email Address", key="login_email")
         password = st.text_input("Password", type="password", key="login_password")
-        
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            remember_me = st.checkbox("Remember me", value=True)
+        with col2:
+            st.markdown('<div class="forgot-password"><a href="#">Forgot password?</a></div>', unsafe_allow_html=True)
         login_button = st.form_submit_button("Login to My Account", type="primary", use_container_width=True)
         if login_button:
             if not email or not password:
@@ -490,6 +1153,8 @@ def show_login_form():
                         st.session_state.user_account = result["user_record"]
                         st.session_state.logged_in = True
                         st.session_state.data_loaded = False
+                        if remember_me:
+                            st.query_params['user'] = result['user_id']
                         st.success("✅ Login successful!")
                         st.rerun()
                     else:
@@ -509,7 +1174,7 @@ def show_signup_form():
             password = st.text_input("Password*", type="password", key="signup_password")
         with col2:
             confirm_password = st.text_input("Confirm Password*", type="password", key="signup_confirm_password")
-        
+        accept_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy*", key="signup_terms")
         signup_button = st.form_submit_button("Create My Account", type="primary", use_container_width=True)
         if signup_button:
             errors = []
@@ -523,7 +1188,12 @@ def show_signup_form():
                 errors.append("Password must be at least 8 characters")
             if password != confirm_password:
                 errors.append("Passwords do not match")
-            
+            if not accept_terms:
+                errors.append("You must accept the terms and conditions")
+            if email and "@" in email:
+                existing_account = get_account_data(email=email)
+                if existing_account:
+                    errors.append("An account with this email already exists")
             if errors:
                 for error in errors:
                     st.error(error)
@@ -531,36 +1201,145 @@ def show_signup_form():
                 user_data = {
                     "first_name": first_name,
                     "last_name": last_name,
-                    "email": email
+                    "email": email,
+                    "account_for": "self"
                 }
                 with st.spinner("Creating your account..."):
                     result = create_user_account(user_data, password)
                     if result["success"]:
+                        email_sent = send_welcome_email(user_data, {
+                            "user_id": result["user_id"],
+                            "password": password
+                        })
                         st.session_state.user_id = result["user_id"]
                         st.session_state.user_account = result["user_record"]
                         st.session_state.logged_in = True
                         st.session_state.data_loaded = False
+                        st.session_state.show_profile_setup = True
                         st.success("✅ Account created successfully!")
+                        if email_sent:
+                            st.info(f"📧 Welcome email sent to {email}")
                         st.balloons()
                         st.rerun()
                     else:
                         st.error(f"Error creating account: {result.get('error', 'Unknown error')}")
 
+def show_profile_setup_modal():
+    st.markdown('<div class="profile-setup-modal">', unsafe_allow_html=True)
+    st.title("👤 Complete Your Profile")
+    st.write("Please complete your profile to start building your timeline:")
+    with st.form("profile_setup_form"):
+        st.write("**Gender**")
+        gender = st.radio(
+            "Gender",
+            ["Male", "Female", "Other", "Prefer not to say"],
+            horizontal=True,
+            key="modal_gender",
+            label_visibility="collapsed"
+        )
+        st.write("**Birthdate**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            months = ["January", "February", "March", "April", "May", "June",
+                      "July", "August", "September", "October", "November", "December"]
+            birth_month = st.selectbox("Month", months, key="modal_month", label_visibility="collapsed")
+        with col2:
+            days = list(range(1, 32))
+            birth_day = st.selectbox("Day", days, key="modal_day", label_visibility="collapsed")
+        with col3:
+            current_year = datetime.now().year
+            years = list(range(current_year, current_year - 120, -1))
+            birth_year = st.selectbox("Year", years, key="modal_year", label_visibility="collapsed")
+        st.write("**Is this account for you or someone else?**")
+        account_for = st.radio(
+            "Account Type",
+            ["For me", "For someone else"],
+            key="modal_account_type",
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        col1, col2 = st.columns(2)
+        with col1:
+            submit_button = st.form_submit_button("Complete Profile", type="primary", use_container_width=True)
+        with col2:
+            skip_button = st.form_submit_button("Skip for Now", type="secondary", use_container_width=True)
+        if submit_button or skip_button:
+            if submit_button:
+                if not birth_month or not birth_day or not birth_year:
+                    st.error("Please complete your birthdate or click 'Skip for Now'")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    return
+            birthdate = f"{birth_month} {birth_day}, {birth_year}" if submit_button else ""
+            account_for_value = "self" if account_for == "For me" else "other"
+            if st.session_state.user_account:
+                st.session_state.user_account['profile']['gender'] = gender if submit_button else ""
+                st.session_state.user_account['profile']['birthdate'] = birthdate
+                st.session_state.user_account['profile']['timeline_start'] = birthdate
+                st.session_state.user_account['account_type'] = account_for_value
+                save_account_data(st.session_state.user_account)
+                st.success("Profile updated successfully!")
+            st.session_state.show_profile_setup = False
+            st.markdown('</div>', unsafe_allow_html=True)
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # ── Main App Flow ─────────────────────────────────────────────────────────────
 # Check if sessions are loaded
 if not SESSIONS:
-    st.error("❌ No sessions loaded.")
+    st.error("❌ No sessions loaded. Please create a sessions/sessions.csv file.")
     st.info("""
-    The app will create a default sessions.csv file.
-    Please refresh the page.
+    Create a CSV file with this format:
+    
+    session_id,title,guidance,question,word_target
+    1,Childhood,"Welcome to Session 1...","What is your earliest memory?",500
+    1,Childhood,,"Can you describe your family home?",500
+    2,Family,"Welcome to Session 2...","How would you describe your relationship?",500
+    
+    Save it as: sessions/sessions.csv
     """)
+    st.stop()
+
+if st.session_state.get('show_profile_setup', False):
+    show_profile_setup_modal()
     st.stop()
 
 if not st.session_state.logged_in:
     show_login_signup()
     st.stop()
 
-# Main header - LOGO
+if not st.session_state.historical_events_loaded:
+    try:
+        events = load_historical_events()
+        st.session_state.historical_events_loaded = True
+    except:
+        pass
+
+# Show modals in priority order
+if st.session_state.show_vignette_detail:
+    show_vignette_detail()
+    st.stop()
+
+if st.session_state.show_vignette_manager:
+    show_vignette_manager()
+    st.stop()
+
+if st.session_state.show_vignette_modal:
+    show_vignette_modal()
+    st.stop()
+
+if st.session_state.show_topic_browser:
+    show_topic_browser()
+    st.stop()
+
+if st.session_state.show_session_manager:
+    show_session_manager()
+    st.stop()
+
+if st.session_state.show_session_creator:
+    show_session_creator()
+    st.stop()
+
+# Main header - ONLY LOGO
 st.markdown(f"""
 <div class="main-header">
 <img src="{LOGO_URL}" class="logo-img" alt="Tell My Story Logo">
@@ -569,45 +1348,79 @@ st.markdown(f"""
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
+    # Add "Tell My Story" header at top of sidebar
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 0; margin-bottom: 1rem; border-bottom: 2px solid #b5f5ec;">
+        <h2 style="color: #0066cc; margin: 0;">Tell My Story</h2>
+        <p style="color: #36cfc9; font-size: 0.9rem; margin: 0.25rem 0 0 0;">Your Life Timeline</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 1. Your Profile
     st.header("👤 Your Profile")
     if st.session_state.user_account:
         profile = st.session_state.user_account['profile']
         st.success(f"✓ **{profile['first_name']} {profile['last_name']}**")
     
-    if st.button("🚪 Log Out", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user_id = ""
-        st.session_state.user_account = None
+    # Full width buttons (stacked)
+    if st.button("📝 Edit Profile", use_container_width=True):
+        st.session_state.show_profile_setup = True
         st.rerun()
+    
+    if st.button("🚪 Log Out", use_container_width=True):
+        logout_user()
     
     st.divider()
     
-    # Sessions
+    # 2. Writing Streak
+    st.header("🔥 Writing Streak")
+    streak_emoji = get_streak_emoji(st.session_state.streak_days)
+    st.markdown(f"<div class='streak-flame'>{streak_emoji}</div>", unsafe_allow_html=True)
+    st.markdown(f"**{st.session_state.streak_days} day streak**")
+    st.caption(f"Total writing days: {st.session_state.total_writing_days}")
+    
+    if st.session_state.streak_days >= 7:
+        st.success("🏆 Weekly Writer!")
+    if st.session_state.streak_days >= 30:
+        st.success("🌟 Monthly Master!")
+    
+    st.divider()
+    
+    # 3. Sessions - FIXED: Show multiple answers count
     st.header("📖 Sessions")
     for i, session in enumerate(SESSIONS):
         session_id = session["id"]
         session_data = st.session_state.responses.get(session_id, {})
         
-        # Count questions with answers
-        answered_count = 0
-        for question in session["questions"]:
-            answer_key = f"{question}_answer_1"
-            if answer_key in session_data.get("questions", {}):
-                answered_count += 1
+        # Count unique questions answered (not total answers)
+        unique_questions = set()
+        total_answers = 0
+        for answer_key, answer_data in session_data.get("questions", {}).items():
+            total_answers += 1
+            if "question" in answer_data:
+                unique_questions.add(answer_data["question"])
+            else:
+                # For backward compatibility
+                if '_answer_' in answer_key:
+                    unique_questions.add(answer_key.split('_answer_')[0])
+                else:
+                    unique_questions.add(answer_key)
         
+        responses_count = len(unique_questions)
         total_questions = len(session["questions"])
         
-        # Status indicator
-        if answered_count == total_questions:
-            status = "🔴"
-        elif answered_count > 0:
-            status = "🟡"
+        # Traffic light system
+        if responses_count == total_questions:
+            status = "🔴"  # Red - Complete
+        elif responses_count > 0:
+            status = "🟡"  # Yellow - In progress
         else:
-            status = "🟢"
+            status = "🟢"  # Green - Not started
         
         if i == st.session_state.current_session:
-            status = "▶️"
+            status = "▶️"  # Current session
         
+        # Show multiple answers count
         button_text = f"{status} {session_id}: {session['title']}"
         
         if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
@@ -615,13 +1428,104 @@ with st.sidebar:
             st.session_state.current_question = 0
             st.session_state.editing = None
             st.session_state.current_question_override = None
-            st.session_state.current_answer = ""
+            st.session_state.image_prompt_mode = False
             st.rerun()
     
     st.divider()
     
-    # Settings
-    st.header("✍️ Settings")
+    # 4. Quick Capture
+    st.header("⚡ Quick Capture")
+    with st.expander("💭 Jot Now - Quick Memory", expanded=False):
+        quick_note = st.text_area(
+            "Got a memory? Jot it down:",
+            value="",
+            height=120,
+            placeholder="E.g., 'That summer at grandma's house in 1995...'",
+            key="jot_text_area",
+            label_visibility="collapsed"
+        )
+        
+        # Stacked buttons inside expander
+        if st.button("💾 Save Jot", key="save_jot_btn", use_container_width=True):
+            if quick_note and quick_note.strip():
+                estimated_year = estimate_year_from_text(quick_note)
+                save_jot(quick_note, estimated_year)
+                st.success("Saved! ✨")
+                st.rerun()
+            else:
+                st.warning("Please write something first!")
+        
+        use_disabled = not quick_note or not quick_note.strip()
+        if st.button("📝 Use as Prompt", key="use_jot_btn", use_container_width=True, disabled=use_disabled):
+            st.session_state.current_question_override = quick_note
+            st.info("Ready to write about this!")
+            st.rerun()
+            
+        if st.session_state.get('quick_jots'):
+            st.caption(f"📝 {len(st.session_state.quick_jots)} quick notes saved")
+            if st.button("View Quick Notes", key="view_jots_btn", use_container_width=True):
+                st.session_state.show_jots = True
+                st.rerun()
+    
+    st.divider()
+    
+    # 5. Vignettes - FIXED: Now stacked
+    st.header("✨ Vignettes")
+    if st.button("📝 New Vignette", use_container_width=True):
+        st.session_state.show_vignette_modal = True
+        st.rerun()
+    
+    if st.button("📖 View All", use_container_width=True):
+        st.session_state.show_vignette_manager = True
+        st.rerun()
+    
+    st.divider()
+    
+    # 6. Historical Context
+    st.header("📜 Historical Context")
+    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
+        try:
+            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
+            events = get_events_for_birth_year(birth_year)
+            if events:
+                st.caption(f"From {birth_year} to present")
+                
+                with st.expander("View Sample Events", expanded=False):
+                    for i, event in enumerate(events[:5]):
+                        region_emoji = "🇬🇧" if event.get('region') == 'UK' else "🌍"
+                        st.markdown(f"**{region_emoji} {event['event']}**")
+                        st.caption(f"{event['year_range']} • {event.get('category', 'General')}")
+                        if i < 4:
+                            st.divider()
+        except:
+            st.info("Add birthdate to see historical context")
+    else:
+        st.info("Add your birthdate to enable historical context")
+    
+    st.divider()
+    
+    # 7. Session Management - FIXED: Now stacked
+    st.header("📖 Session Management")
+    if st.button("📋 All Sessions", use_container_width=True):
+        st.session_state.show_session_manager = True
+        st.rerun()
+    
+    if st.button("➕ Custom Session", use_container_width=True):
+        st.session_state.show_session_creator = True
+        st.rerun()
+    
+    st.divider()
+    
+    # 8. Topic Management
+    st.header("📚 Topic Management")
+    if st.button("🔍 Browse Topics", use_container_width=True):
+        st.session_state.show_topic_browser = True
+        st.rerun()
+    
+    st.divider()
+    
+    # 9. Interview Style
+    st.header("✍️ Interview Style")
     ghostwriter_mode = st.toggle(
         "Professional Ghostwriter Mode",
         value=st.session_state.ghostwriter_mode,
@@ -640,17 +1544,141 @@ with st.sidebar:
         st.session_state.spellcheck_enabled = spellcheck_enabled
         st.rerun()
     
+    if st.session_state.ghostwriter_mode:
+        st.success("✓ Professional mode active")
+        st.caption("With historical context")
+    else:
+        st.info("Standard mode active")
+    
     st.divider()
     
-    # Clear Data
+    # 10. Export Options - FIXED: Updated to handle multiple answers AND FIXED PUBLISHER FORMAT
+    st.subheader("📤 Export Options")
+    
+    # Count total answers (not just questions)
+    total_answers = 0
+    for session_id, session_data in st.session_state.responses.items():
+        total_answers += len(session_data.get("questions", {}))
+    st.caption(f"Total answers: {total_answers}")
+    
+    if st.session_state.logged_in and st.session_state.user_id:
+        # FIXED: Prepare data in the EXACT format the publisher expects
+        export_data = []
+        story_index = 1
+        
+        for session in SESSIONS:
+            session_id = session["id"]
+            session_data = st.session_state.responses.get(session_id, {})
+            if session_data.get("questions"):
+                # Group answers by question
+                questions_dict = {}
+                for answer_key, answer_data in session_data["questions"].items():
+                    question_text = answer_data.get("question", answer_key.split('_answer_')[0] if '_answer_' in answer_key else answer_key)
+                    if question_text not in questions_dict:
+                        questions_dict[question_text] = []
+                    
+                    questions_dict[question_text].append({
+                        "answer": answer_data["answer"],
+                        "timestamp": answer_data["timestamp"],
+                        "answer_index": answer_data.get("answer_index", 1)
+                    })
+                
+                # Add each answer as a separate story entry for the publisher
+                for question_text, answers in questions_dict.items():
+                    for answer_data in answers:
+                        export_data.append({
+                            "question": question_text,
+                            "answer": answer_data["answer"],
+                            "timestamp": answer_data["timestamp"],
+                            "answer_index": answer_data.get("answer_index", 1),
+                            "session_id": session_id,
+                            "session_title": session["title"]
+                        })
+                        story_index += 1
+        
+        if export_data:
+            # Count total stories
+            total_stories = len(export_data)
+            
+            # Create complete export data in the EXACT format publisher expects
+            complete_data = {
+                "user": st.session_state.user_id,
+                "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
+                "stories": export_data,  # This is now a LIST, not a dict
+                "export_date": datetime.now().isoformat(),
+                "summary": {
+                    "total_stories": total_stories,
+                    "total_sessions": len(set(s['session_id'] for s in export_data))
+                }
+            }
+            
+            json_data = json.dumps(complete_data, indent=2)
+            encoded_data = base64.b64encode(json_data.encode()).decode()
+            
+            # USE THE ORIGINAL URL FROM YOUR WORKING APP
+            publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
+            publisher_url = f"{publisher_base_url}?data={encoded_data}"
+            
+            # Stacked download buttons - now styled with blue theme
+            stories_only = {
+                "user": st.session_state.user_id,
+                "stories": export_data,
+                "export_date": datetime.now().isoformat()
+            }
+            stories_json = json.dumps(stories_only, indent=2)
+            
+            if st.download_button(
+                label="📥 Stories Only",
+                data=stories_json,
+                file_name=f"Tell_My_Story_Stories_{st.session_state.user_id}.json",
+                mime="application/json",
+                use_container_width=True,
+                key="download_stories_btn"
+            ):
+                pass
+            
+            if st.download_button(
+                label="📊 Complete Data",
+                data=json_data,
+                file_name=f"Tell_My_Story_Complete_{st.session_state.user_id}.json",
+                mime="application/json",
+                use_container_width=True,
+                key="download_complete_btn"
+            ):
+                pass
+            
+            st.divider()
+            st.markdown(f'''
+            <a href="{publisher_url}" target="_blank">
+            <button class="html-link-btn">
+            🖨️ Publish Biography
+            </button>
+            </a>
+            ''', unsafe_allow_html=True)
+            st.caption("Create a beautiful book with your stories")
+        else:
+            st.warning("No data to export yet! Start by answering some questions.")
+    else:
+        st.warning("Please log in to export your data.")
+    
+    st.divider()
+    
+    # 11. Clear Data - FIXED: Now stacked with disclaimer AND FIXED TO CLEAR PROPERLY
     st.subheader("⚠️ Clear Data")
+    st.caption("**WARNING: This action cannot be undone - you will lose all your work!**")
+    
     if st.session_state.confirming_clear == "session":
+        st.markdown('<div class="warning-box">', unsafe_allow_html=True)
         st.warning("**WARNING: This will delete ALL answers in the current session!**")
         
         if st.button("✅ Confirm Delete Session", type="primary", use_container_width=True, key="confirm_delete_session"):
             current_session_id = SESSIONS[st.session_state.current_session]["id"]
             try:
+                # Clear responses
                 st.session_state.responses[current_session_id]["questions"] = {}
+                # Clear conversations
+                if current_session_id in st.session_state.session_conversations:
+                    st.session_state.session_conversations[current_session_id] = {}
                 save_user_data(st.session_state.user_id, st.session_state.responses)
                 st.session_state.confirming_clear = None
                 st.rerun()
@@ -660,9 +1688,39 @@ with st.sidebar:
         if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_session"):
             st.session_state.confirming_clear = None
             st.rerun()
+            
+        st.markdown('</div>', unsafe_allow_html=True)
+    elif st.session_state.confirming_clear == "all":
+        st.markdown('<div class="warning-box">', unsafe_allow_html=True)
+        st.warning("**WARNING: This will delete ALL answers for ALL sessions!**")
+        
+        if st.button("✅ Confirm Delete All", type="primary", use_container_width=True, key="confirm_delete_all"):
+            try:
+                # Clear all responses
+                for session in SESSIONS:
+                    session_id = session["id"]
+                    st.session_state.responses[session_id]["questions"] = {}
+                # Clear all conversations
+                st.session_state.session_conversations = {}
+                save_user_data(st.session_state.user_id, st.session_state.responses)
+                st.session_state.confirming_clear = None
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
+        
+        if st.button("❌ Cancel", type="secondary", use_container_width=True, key="cancel_delete_all"):
+            st.session_state.confirming_clear = None
+            st.rerun()
+            
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
+        # Stacked clear buttons
         if st.button("🗑️ Clear Session", type="secondary", use_container_width=True, key="clear_session_btn"):
             st.session_state.confirming_clear = "session"
+            st.rerun()
+        
+        if st.button("🔥 Clear All", type="secondary", use_container_width=True, key="clear_all_btn"):
+            st.session_state.confirming_clear = "all"
             st.rerun()
 
 # ── Main Content Area ─────────────────────────────────────────────────────────
@@ -685,35 +1743,55 @@ else:
 
 st.markdown("---")
 
-# SINGLE ANSWER BOX VERSION
+# NEW EXACT LAYOUT AS REQUESTED
+# Row 1: Session title and topics explored with progress bar
 col1, col2 = st.columns([3, 1])
 
 with col1:
     st.subheader(f"Session {current_session_id}: {current_session['title']}")
     
-    # Count questions with answers
+    # Count unique questions answered and total answers
     session_data = st.session_state.responses.get(current_session_id, {})
-    answered_count = 0
-    for question in current_session["questions"]:
-        answer_key = f"{question}_answer_1"
-        if answer_key in session_data.get("questions", {}):
-            answered_count += 1
+    unique_questions = set()
+    total_answers = 0
+    for answer_key, answer_data in session_data.get("questions", {}).items():
+        total_answers += 1
+        if "question" in answer_data:
+            unique_questions.add(answer_data["question"])
+        else:
+            if '_answer_' in answer_key:
+                unique_questions.add(answer_key.split('_answer_')[0])
+            else:
+                unique_questions.add(answer_key)
     
-    total_questions = len(current_session["questions"])
+    topics_answered = len(unique_questions)
+    total_topics = len(current_session["questions"])
     
     # Progress bar for topics
-    if total_questions > 0:
-        topic_progress = answered_count / total_questions
+    if total_topics > 0:
+        topic_progress = topics_answered / total_topics
         st.progress(min(topic_progress, 1.0))
-        st.caption(f"📝 Topics explored: {answered_count}/{total_questions}")
+        st.caption(f"📝 Topics explored: {topics_answered}/{total_topics} ({topic_progress*100:.0f}%)")
+    
+    # Show multiple answers count if applicable
+    if total_answers > topics_answered:
+        st.caption(f"📚 Total answers: {total_answers} (+{total_answers - topics_answered} additional answers)")
 
 with col2:
+    # Show custom topic indicator if needed
     if question_source == "custom":
-        st.markdown(f'<div style="margin-top: 1rem; color: #ff6b00;">✨ Custom Topic</div>', unsafe_allow_html=True)
+        if st.session_state.current_question_override.startswith("Vignette:"):
+            st.markdown(f'<div class="question-counter" style="margin-top: 1rem; color: #9b59b6;">📝 Vignette</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="question-counter" style="margin-top: 1rem; color: #ff6b00;">✨ Custom Topic</div>', unsafe_allow_html=True)
     else:
         current_topic = st.session_state.current_question + 1
         total_topics = len(current_session["questions"])
-        st.markdown(f'<div style="margin-top: 1rem;">Topic {current_topic} of {total_topics}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="question-counter" style="margin-top: 1rem;">Topic {current_topic} of {total_topics}</div>', unsafe_allow_html=True)
+
+# Professional Ghostwriter Mode tag
+if st.session_state.ghostwriter_mode:
+    st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode (with historical context)</p>', unsafe_allow_html=True)
 
 # The main question
 st.markdown(f"""
@@ -723,185 +1801,422 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Guidance text
-if question_source == "regular" and current_session.get('guidance'):
+if question_source == "regular":
     st.markdown(f"""
-    <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
+    <div class="chapter-guidance">
     {current_session.get('guidance', '')}
     </div>
     """, unsafe_allow_html=True)
-
-# ── YOUR ANSWER SECTION ───────────────────────────────────────────────────────
-# Load existing answer for THIS specific topic
-existing_answer = get_response_single(current_session_id, current_question_text, answer_index=1)
-
-# If we have an existing answer, show it with edit/delete buttons
-if existing_answer:
-    st.markdown("### 📝 Your Answer")
-    
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        # Show word count
-        word_count = len(re.findall(r'\w+', existing_answer['answer']))
-        st.caption(f"📊 {word_count} words • Last saved: {existing_answer['timestamp'][:10]}")
-    
-    with col2:
-        # Edit and Delete buttons
-        edit_col, delete_col = st.columns(2)
-        with edit_col:
-            if st.button("✏️ Edit", key="edit_existing_btn", use_container_width=True):
-                st.session_state.editing = True
-                st.session_state.edit_text = existing_answer['answer']
-                st.rerun()
-        with delete_col:
-            if st.button("🗑️ Delete", key="delete_existing_btn", use_container_width=True):
-                if delete_response_single(current_session_id, current_question_text, answer_index=1):
-                    st.success("Answer deleted!")
-                    st.rerun()
-    
-    # Show the existing answer
-    st.markdown(f"""
-    <div class="answer-display-box">
-    {existing_answer['answer'].replace('\n', '<br>')}
-    </div>
-    """, unsafe_allow_html=True)
-
-# If we're editing or there's no existing answer, show the text area
-if st.session_state.editing or not existing_answer:
-    # Get the current text to edit
-    if st.session_state.editing:
-        current_text = st.session_state.edit_text
+else:
+    if st.session_state.current_question_override.startswith("Vignette:"):
+        st.info("📝 **Vignette Mode** - Write a short, focused story about a specific moment or memory.")
     else:
-        current_text = ""
+        st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
+
+# ── Conversation Area (UPDATED FOR MULTIPLE ANSWERS WITH DELETE BUTTON) ──────
+if current_session_id not in st.session_state.session_conversations:
+    st.session_state.session_conversations[current_session_id] = {}
+
+# Get all answers for this question
+all_answers_for_question = []
+for answer_key, answer_data in st.session_state.responses.get(current_session_id, {}).get("questions", {}).items():
+    if "question" in answer_data and answer_data["question"] == current_question_text:
+        all_answers_for_question.append({
+            "key": answer_key,
+            "data": answer_data,
+            "index": answer_data.get("answer_index", 1)
+        })
+    elif current_question_text in answer_key and '_answer_' in answer_key:
+        # For backward compatibility
+        all_answers_for_question.append({
+            "key": answer_key,
+            "data": answer_data,
+            "index": int(answer_key.split('_answer_')[1]) if '_answer_' in answer_key else 1
+        })
+
+# Sort answers by index
+all_answers_for_question.sort(key=lambda x: x["index"])
+
+# Initialize conversation if needed
+if current_question_text not in st.session_state.session_conversations[current_session_id]:
+    st.session_state.session_conversations[current_session_id][current_question_text] = []
     
-    # Create a dynamic key for the text box - unique per topic
-    text_box_key = f"answer_box_{current_session_id}_{hash(current_question_text)}"
+    # Add welcome message
+    welcome_msg = f"""Let's explore this topic in detail: {current_question_text}\n\n"""
+    if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
+        welcome_msg += "📝 Vignette Mode: Write a short, focused story about this specific moment or memory."
+    elif question_source == "custom":
+        welcome_msg += "✨ Custom Topic: Write about whatever comes to mind!"
+    else:
+        welcome_msg += "Take your time with this—good biographies are built from thoughtful reflection."
     
-    # Text area for writing answer - always start empty
-    user_input = st.text_area(
-        label="Write your answer below:",
-        value="",  # Always empty - text from one topic won't appear in another
-        height=300,
-        placeholder="Start writing your story here... (Your text will be auto-saved as you type)",
-        key=text_box_key,
+    st.session_state.session_conversations[current_session_id][current_question_text].append({
+        "role": "assistant",
+        "content": welcome_msg
+    })
+    
+    # Add existing answers to conversation
+    for answer_info in all_answers_for_question:
+        st.session_state.session_conversations[current_session_id][current_question_text].append({
+            "role": "user",
+            "content": answer_info["data"]["answer"],
+            "answer_index": answer_info["index"]
+        })
+        # Add AI response placeholder
+        st.session_state.session_conversations[current_session_id][current_question_text].append({
+            "role": "assistant",
+            "content": f"Thank you for sharing this perspective. You can add more memories about this topic."
+        })
+
+conversation = st.session_state.session_conversations[current_session_id][current_question_text]
+
+# Show how many answers exist for this question
+if all_answers_for_question:
+    st.info(f"📚 You have {len(all_answers_for_question)} answer(s) for this question. Add another perspective below:")
+
+# Display conversation WITH DELETE BUTTONS
+for i, message in enumerate(conversation):
+    if message["role"] == "assistant":
+        with st.chat_message("assistant", avatar="👔"):
+            st.markdown(message["content"])
+    elif message["role"] == "user":
+        is_editing = (st.session_state.editing == (current_session_id, current_question_text, i))
+        with st.chat_message("user", avatar="👤"):
+            if is_editing:
+                new_text = st.text_area(
+                    "Edit your answer:",
+                    value=st.session_state.edit_text,
+                    key=f"edit_area_{current_session_id}_{hash(current_question_text)}_{i}",
+                    height=150,
+                    label_visibility="collapsed"
+                )
+                if new_text:
+                    edit_word_count = len(re.findall(r'\w+', new_text))
+                    st.caption(f"📝 Editing: {edit_word_count} words")
+                    col1, col2, col3 = st.columns([1, 1, 1])
+                    with col1:
+                        if st.button("✓ Save", key=f"save_{current_session_id}_{hash(current_question_text)}_{i}", type="primary", use_container_width=True):
+                            if st.session_state.spellcheck_enabled:
+                                new_text = auto_correct_text(new_text)
+                            conversation[i]["content"] = new_text
+                            st.session_state.session_conversations[current_session_id][current_question_text] = conversation
+                            
+                            # Find and update the corresponding answer
+                            answer_index = message.get("answer_index", 1)
+                            save_response(current_session_id, current_question_text, new_text, answer_index=answer_index)
+                            
+                            st.session_state.editing = None
+                            st.rerun()
+                    with col2:
+                        if st.button("✕ Cancel", key=f"cancel_{current_session_id}_{hash(current_question_text)}_{i}", use_container_width=True):
+                            st.session_state.editing = None
+                            st.rerun()
+                    with col3:
+                        answer_index = message.get("answer_index", 1)
+                        if st.button("🗑️ Delete", key=f"delete_{current_session_id}_{hash(current_question_text)}_{i}", type="secondary", use_container_width=True):
+                            if delete_response(current_session_id, current_question_text, answer_index):
+                                st.success("Answer deleted!")
+                                st.rerun()
+            else:
+                col1, col2 = st.columns([5, 1])
+                with col1:
+                    st.markdown(message["content"])
+                    word_count = len(re.findall(r'\w+', message["content"]))
+                    answer_num = message.get("answer_index", "?")
+                    st.caption(f"📝 Answer #{answer_num} • {word_count} words")
+                with col2:
+                    button_col1, button_col2 = st.columns(2)
+                    with button_col1:
+                        if st.button("✏️", key=f"edit_{st.session_state.current_session}_{hash(current_question_text)}_{i}", help="Edit this answer"):
+                            st.session_state.editing = (current_session_id, current_question_text, i)
+                            st.session_state.edit_text = message["content"]
+                            st.rerun()
+                    with button_col2:
+                        answer_index = message.get("answer_index", 1)
+                        if st.button("🗑️", key=f"del_{st.session_state.current_session}_{hash(current_question_text)}_{i}", help="Delete this answer"):
+                            if delete_response(current_session_id, current_question_text, answer_index):
+                                st.success("Answer deleted!")
+                                st.rerun()
+
+# BIG ANSWER BOX with SAVE button (not arrow) - CHANGED AS REQUESTED
+st.write("")
+st.write("")
+user_input = st.text_area(
+    "Type your long-form answer here...",
+    key="long_form_answer",
+    height=200,
+    placeholder="Write your detailed response here. This is where you should write your full story...",
+    label_visibility="visible"
+)
+
+# CHANGED: Save button instead of arrow button
+col1, col2 = st.columns([1, 3])
+with col1:
+    if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
+        if user_input:
+            if st.session_state.spellcheck_enabled:
+                user_input = auto_correct_text(user_input)
+            
+            # Determine answer index
+            next_answer_index = len(all_answers_for_question) + 1
+            
+            # Add user message to conversation
+            conversation.append({
+                "role": "user", 
+                "content": user_input,
+                "answer_index": next_answer_index
+            })
+            
+            # Save the response with auto-incremented index
+            save_response(current_session_id, current_question_text, user_input)
+            
+            with st.chat_message("assistant", avatar="👔"):
+                with st.spinner("Reflecting on your story..."):
+                    try:
+                        conversation_history = conversation[:-1]
+                        messages_for_api = [
+                            {"role": "system", "content": get_system_prompt()},
+                            *conversation_history,
+                            {"role": "user", "content": user_input}
+                        ]
+                        temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
+                        max_tokens = 400 if st.session_state.ghostwriter_mode else 300
+                        response = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=messages_for_api,
+                            temperature=temperature,
+                            max_tokens=max_tokens
+                        )
+                        ai_response = response.choices[0].message.content
+                        if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
+                            ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
+                        st.markdown(ai_response)
+                        conversation.append({"role": "assistant", "content": ai_response})
+                    except Exception as e:
+                        error_msg = "Thank you for sharing that. Your response has been saved."
+                        st.markdown(error_msg)
+                        conversation.append({"role": "assistant", "content": error_msg})
+            st.session_state.session_conversations[current_session_id][current_question_text] = conversation
+            st.rerun()
+        else:
+            st.warning("Please write something before saving!")
+
+with col2:
+    # Navigation buttons
+    nav_col1, nav_col2 = st.columns(2)
+    with nav_col1:
+        prev_disabled = st.session_state.current_question == 0
+        if st.button("← Previous Topic", 
+                    disabled=prev_disabled,
+                    key="bottom_prev_btn",
+                    use_container_width=True):
+            if not prev_disabled:
+                st.session_state.current_question -= 1
+                st.session_state.editing = None
+                st.session_state.current_question_override = None
+                st.session_state.image_prompt_mode = False
+                st.rerun()
+    
+    with nav_col2:
+        next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
+        if st.button("Next Topic →", 
+                    disabled=next_disabled,
+                    key="bottom_next_btn",
+                    use_container_width=True):
+            if not next_disabled:
+                st.session_state.current_question += 1
+                st.session_state.editing = None
+                st.session_state.current_question_override = None
+                st.session_state.image_prompt_mode = False
+                st.rerun()
+
+# Session Progress
+st.divider()
+progress_info = get_progress_info(current_session_id)
+st.markdown(f"""
+<div class="progress-container">
+<div class="progress-header">📊 Session Progress</div>
+<div class="progress-status">{progress_info['emoji']} {progress_info['progress_percent']:.0f}% complete • {progress_info['remaining_words']} words remaining</div>
+<div class="progress-bar-container">
+<div class="progress-bar-fill" style="width: {min(progress_info['progress_percent'], 100)}%; background-color: {progress_info['color']};"></div>
+</div>
+<div style="text-align: center; font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
+{progress_info['current_count']} / {progress_info['target']} words
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+if st.button("✏️ Change Word Target", key="edit_word_target_bottom", use_container_width=True):
+    st.session_state.editing_word_target = not st.session_state.editing_word_target
+    st.rerun()
+
+if st.session_state.editing_word_target:
+    st.markdown('<div class="edit-target-box">', unsafe_allow_html=True)
+    st.write("**Change Word Target**")
+    new_target = st.number_input(
+        "Target words for this session:",
+        min_value=100,
+        max_value=5000,
+        value=progress_info['target'],
+        key="target_edit_input_bottom",
         label_visibility="collapsed"
     )
+    col_save, col_cancel = st.columns(2)
+    with col_save:
+        if st.button("💾 Save", key="save_word_target_bottom", type="primary", use_container_width=True):
+            st.session_state.responses[current_session_id]["word_target"] = new_target
+            save_user_data(st.session_state.user_id, st.session_state.responses)
+            st.session_state.editing_word_target = False
+            st.rerun()
+    with col_cancel:
+        if st.button("❌ Cancel", key="cancel_word_target_bottom", use_container_width=True):
+            st.session_state.editing_word_target = False
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Footer Stats
+st.divider()
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    total_words_all_sessions = sum(calculate_author_word_count(s["id"]) for s in SESSIONS)
+    st.metric("Total Words", f"{total_words_all_sessions}")
+with col2:
+    # Count unique questions answered across all sessions
+    unique_questions_all = set()
+    for session in SESSIONS:
+        session_id = session["id"]
+        session_data = st.session_state.responses.get(session_id, {})
+        for answer_key, answer_data in session_data.get("questions", {}).items():
+            if "question" in answer_data:
+                unique_questions_all.add((session_id, answer_data["question"]))
     
-    # Word count display
-    word_count = len(re.findall(r'\w+', user_input))
+    completed_sessions = sum(1 for s in SESSIONS if len([q for (sid, q) in unique_questions_all if sid == s["id"]]) == len(s["questions"]))
+    st.metric("Completed Sessions", f"{completed_sessions}/{len(SESSIONS)}")
+with col3:
+    total_topics_answered = len(unique_questions_all)
+    total_all_topics = sum(len(s["questions"]) for s in SESSIONS)
+    st.metric("Topics Explored", f"{total_topics_answered}/{total_all_topics}")
+with col4:
+    # Count total answers (not just topics)
+    total_answers_all = 0
+    for session in SESSIONS:
+        session_id = session["id"]
+        session_data = st.session_state.responses.get(session_id, {})
+        total_answers_all += len(session_data.get("questions", {}))
+    st.metric("Total Answers", f"{total_answers_all}")
+
+# ============================================================================
+# SECTION: BIOGRAPHY FORMATTER EXPORT (UPDATED FOR MULTIPLE ANSWERS WITH FIXED FORMAT)
+# ============================================================================
+st.divider()
+st.subheader("📘 Biography Formatter")
+
+# Get the current user's data
+current_user = st.session_state.get('user_id', '')
+export_data = []
+
+# Prepare data for export (LIST FORMAT for publisher)
+for session in SESSIONS:
+    session_id = session["id"]
+    session_data = st.session_state.responses.get(session_id, {})
+    if session_data.get("questions"):
+        for answer_key, answer_data in session_data["questions"].items():
+            question_text = answer_data.get("question", answer_key.split('_answer_')[0] if '_answer_' in answer_key else answer_key)
+            
+            export_data.append({
+                "question": question_text,
+                "answer": answer_data["answer"],
+                "timestamp": answer_data["timestamp"],
+                "answer_index": answer_data.get("answer_index", 1),
+                "session_id": session_id,
+                "session_title": session["title"]
+            })
+
+if current_user and current_user != "" and export_data:
+    # Count total stories
+    total_stories = len(export_data)
     
-    col1, col2, col3 = st.columns([2, 2, 1])
+    # Create JSON data for the publisher in the CORRECT FORMAT
+    json_data = json.dumps({
+        "user": current_user,
+        "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
+        "stories": export_data,  # LIST format, not dict
+        "export_date": datetime.now().isoformat(),
+        "summary": {
+            "total_stories": total_stories,
+            "total_sessions": len(set(s['session_id'] for s in export_data))
+        }
+    }, indent=2)
+    
+    # Encode the data for URL
+    encoded_data = base64.b64encode(json_data.encode()).decode()
+    
+    # USE THE ORIGINAL URL FROM YOUR WORKING APP
+    publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
+    publisher_url = f"{publisher_base_url}?data={encoded_data}"
+    
+    st.success(f"✅ **{total_stories} stories ready for formatting!**")
+    
+    col1, col2 = st.columns(2)
+    
     with col1:
-        st.caption(f"📝 **{word_count} words** written")
+        st.markdown("#### 🖨️ Format Biography")
+        st.markdown(f"""
+        Generate a professionally formatted biography from your stories.
+        
+        **[📘 Click to Format Biography]({publisher_url})**
+        
+        Your formatted biography will include:
+        • Professional formatting
+        • Table of contents
+        • All your stories organized
+        • Ready to print or share
+        """)
     
     with col2:
-        # Save button
-        if st.button("💾 Save Answer", type="primary", use_container_width=True):
-            if user_input and user_input.strip():
-                # Apply auto-correct if enabled
-                if st.session_state.spellcheck_enabled:
-                    user_input = auto_correct_text_enhanced(user_input)
-                
-                # Save the answer
-                if save_response_single(current_session_id, current_question_text, user_input):
-                    st.success("Answer saved successfully!")
-                    st.session_state.editing = False
-                    st.session_state.edit_text = ""
-                    st.rerun()
-            else:
-                st.warning("Please write something before saving!")
+        st.markdown("#### 🔐 Save to Your Vault")
+        st.markdown("""
+        **After formatting your biography:**
+        
+        1. Generate your biography (link on left)
+        2. Download the formatted PDF
+        3. Save it to your secure vault
+        
+        **[💾 Go to Secure Vault](https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/)**
+        
+        Your vault preserves important documents forever.
+        """)
     
-    with col3:
-        # Force Correction button - FIXED: doesn't reference text box key
-        if st.button("🔧 Force Correction", type="secondary", use_container_width=True):
-            if user_input and user_input.strip():
-                # Store the original text
-                st.session_state.original_text = user_input
-                # Apply correction
-                corrected = auto_correct_text_enhanced(user_input, force_correction=True)
-                
-                # Clear the text box by resetting the session state for that key
-                st.session_state[text_box_key] = corrected
-                
-                st.session_state.correction_applied = True
-                st.success("Correction applied! Review and save if you like it.")
-                st.rerun()
-            else:
-                st.warning("Please write something first!")
-    
-    # Show correction status
-    if st.session_state.correction_applied:
-        st.info("✓ Correction applied. Review the text above and click 'Save Answer' if you want to keep it.")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("✅ Keep Correction", type="primary", use_container_width=True):
-                # Save the corrected text
-                if save_response_single(current_session_id, current_question_text, user_input):
-                    st.session_state.correction_applied = False
-                    st.success("Saved with correction!")
-                    st.rerun()
-        with col2:
-            if st.button("↩️ Revert to Original", type="secondary", use_container_width=True):
-                # Revert to original text
-                if hasattr(st.session_state, 'original_text'):
-                    st.session_state[text_box_key] = st.session_state.original_text
-                st.session_state.correction_applied = False
-                st.rerun()
-    
-    # Cancel button if editing
-    if st.session_state.editing:
-        if st.button("❌ Cancel Edit", type="secondary", use_container_width=True):
-            st.session_state.editing = False
-            st.session_state.edit_text = ""
-            st.rerun()
-
-# Navigation for regular questions (not custom topics)
-if question_source == "regular":
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("⏮️ Previous Topic", use_container_width=True):
-            if st.session_state.current_question > 0:
-                st.session_state.current_question -= 1
-            else:
-                # Go to previous session if we're at the first question
-                if st.session_state.current_session > 0:
-                    st.session_state.current_session -= 1
-                    st.session_state.current_question = len(SESSIONS[st.session_state.current_session]["questions"]) - 1
-            st.session_state.current_question_override = None
-            st.session_state.editing = False
-            st.session_state.edit_text = ""
-            st.rerun()
-    
-    with col2:
-        if st.button("↺ Reset Topic", use_container_width=True):
-            st.session_state.editing = False
-            st.session_state.edit_text = ""
-            st.rerun()
-    
-    with col3:
-        if st.button("⏭️ Next Topic", use_container_width=True):
-            if st.session_state.current_question < len(current_session["questions"]) - 1:
-                st.session_state.current_question += 1
-            else:
-                # Go to next session if we're at the last question
-                if st.session_state.current_session < len(SESSIONS) - 1:
-                    st.session_state.current_session += 1
-                    st.session_state.current_question = 0
-            st.session_state.current_question_override = None
-            st.session_state.editing = False
-            st.session_state.edit_text = ""
-            st.rerun()
-
-# For custom topics, show different navigation
+    # Backup download
+    with st.expander("📥 Download Raw Data (Backup)"):
+        st.download_button(
+            label="Download Stories as JSON",
+            data=json_data,
+            file_name=f"{current_user}_stories.json",
+            mime="application/json",
+            use_container_width=True
+        )
+        st.caption("Use this if the formatter link doesn't work")
+        
+elif current_user and current_user != "":
+    st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
 else:
-    st.markdown("---")
-    if st.button("↺ Return to Regular Topics", use_container_width=True):
-        st.session_state.current_question_override = None
-        st.session_state.editing = False
-        st.session_state.edit_text = ""
-        st.rerun()
+    st.info("👤 **Please log in to format your biography**")
 
+# ============================================================================
+# FOOTER
+# ============================================================================
 st.markdown("---")
-st.caption("© Tell My Story - Preserve Your Legacy")
+if st.session_state.user_account:
+    profile = st.session_state.user_account['profile']
+    account_age = (datetime.now() - datetime.fromisoformat(st.session_state.user_account['created_at'])).days
+    
+    footer_info = f"""
+Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} • 🔥 {st.session_state.streak_days} day streak • 📅 Account Age: {account_age} days
+"""
+    st.caption(footer_info)
+else:
+    st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
+
+
 
