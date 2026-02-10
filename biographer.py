@@ -14,7 +14,7 @@ import string
 import base64
 import pandas as pd
 import sys
-import time  # Added for save delay
+import time
 
 # Add current directory to path to import modules
 sys.path.append('.')
@@ -1396,153 +1396,154 @@ if current_session_id in st.session_state.responses:
     if current_question_text in st.session_state.responses[current_session_id]["questions"]:
         existing_answer = st.session_state.responses[current_session_id]["questions"][current_question_text]["answer"]
 
-# FIX: SIMPLIFIED - Just show edit box with "Continue" button for editing
-if existing_answer:
-    # Show saved answer with edit button
-    st.markdown("### Your Saved Answer:")
-    st.markdown(f'<div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #4CAF50; white-space: pre-wrap; margin-bottom: 20px;">{existing_answer}</div>', unsafe_allow_html=True)
-    
-    # Add space before buttons
-    st.write("")
-    
-    col1, col2, col3 = st.columns([1, 1, 2])
-    
-    with col1:
-        if st.button("✏️ Continue/Edit", key="edit_answer", type="primary", use_container_width=True):
-            # Set flag to show edit box
-            st.session_state[f"show_edit_{current_session_id}_{hash(current_question_text)}"] = True
-            st.rerun()
-    
-    with col2:
+# Large text area (3x bigger - 600px height instead of 200px)
+user_input = st.text_area(
+    "Type your answer here...",
+    value=existing_answer,
+    key=f"answer_box_{current_session_id}_{hash(current_question_text)}",
+    height=600,
+    placeholder="Write your detailed response here...",
+    label_visibility="visible"
+)
+
+# Add space between box and buttons
+st.write("")
+st.write("")
+
+# Action buttons
+col1, col2, col3 = st.columns([1, 1, 2])
+
+with col1:
+    if st.button("💾 Save", key="save_answer", type="primary", use_container_width=True):
+        if user_input:
+            # Show saving message
+            saving_placeholder = st.empty()
+            saving_placeholder.info("🔄 Saving...")
+            
+            # Auto-correct before saving
+            corrected_text = auto_correct_text(user_input)
+            
+            # Save the response
+            if save_response(current_session_id, current_question_text, corrected_text):
+                # Show success then clear
+                saving_placeholder.success("✅ Answer saved successfully!")
+                time.sleep(0.5)  # Brief delay to show success
+                st.rerun()
+            else:
+                saving_placeholder.error("❌ Failed to save answer")
+        else:
+            st.warning("Please write something before saving!")
+
+with col2:
+    if existing_answer:
         if st.button("🗑️ Delete", key="delete_answer", type="secondary", use_container_width=True):
             if delete_response(current_session_id, current_question_text):
                 st.success("Answer deleted!")
                 st.rerun()
-    
-    with col3:
-        # Navigation buttons
-        nav_col1, nav_col2 = st.columns(2)
-        with nav_col1:
-            prev_disabled = st.session_state.current_question == 0
-            if st.button("← Previous Topic", 
-                        disabled=prev_disabled,
-                        key="view_prev_btn",
-                        use_container_width=True):
-                if not prev_disabled:
-                    st.session_state.current_question -= 1
-                    st.session_state.editing = False
-                    st.session_state.current_question_override = None
-                    st.rerun()
-        
-        with nav_col2:
-            next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
-            if st.button("Next Topic →", 
-                        disabled=next_disabled,
-                        key="view_next_btn",
-                        use_container_width=True):
-                if not next_disabled:
-                    st.session_state.current_question += 1
-                    st.session_state.editing = False
-                    st.session_state.current_question_override = None
-                    st.rerun()
+    else:
+        st.button("🗑️ Delete", key="delete_disabled", disabled=True, use_container_width=True)
 
-# Check if we should show edit box (either new answer or clicked "Continue/Edit")
-show_edit = False
-if not existing_answer:
-    show_edit = True
-elif f"show_edit_{current_session_id}_{hash(current_question_text)}" in st.session_state:
-    if st.session_state[f"show_edit_{current_session_id}_{hash(current_question_text)}"]:
-        show_edit = True
-
-if show_edit:
-    # Large text area (3x bigger - 600px height) with space after
-    user_input = st.text_area(
-        "Type your answer here...",
-        value=existing_answer if existing_answer else "",
-        key=f"answer_box_{current_session_id}_{hash(current_question_text)}",
-        height=600,  # FIXED: Back to 600px
-        placeholder="Write your detailed response here...",
-        label_visibility="visible"
-    )
-    
-    # Add space between text box and buttons
-    st.write("")
-    st.write("")
-    
-    # FIX: Add explicit save status
-    save_status = st.empty()
-    
-    # Action buttons
-    col1, col2, col3 = st.columns([1, 1, 2])
-    
-    with col1:
-        if st.button("💾 Save", key="save_answer", type="primary", use_container_width=True):
-            if user_input:
-                # Show saving message
-                save_status.info("🔄 Saving...")
-                
-                # Auto-correct before saving
-                corrected_text = auto_correct_text(user_input)
-                
-                # Save response
-                if save_response(current_session_id, current_question_text, corrected_text):
-                    # Show success message
-                    save_status.success("✅ Answer saved successfully!")
-                    
-                    # Clear edit flag
-                    if f"show_edit_{current_session_id}_{hash(current_question_text)}" in st.session_state:
-                        st.session_state[f"show_edit_{current_session_id}_{hash(current_question_text)}"] = False
-                    
-                    # Small delay to show success message before rerun
-                    time.sleep(0.5)
-                    st.rerun()
-                else:
-                    save_status.error("❌ Failed to save answer")
-            else:
-                st.warning("Please write something before saving!")
-    
-    with col2:
-        if existing_answer:
-            if st.button("❌ Cancel", key="cancel_edit", type="secondary", use_container_width=True):
-                # Clear edit flag
-                if f"show_edit_{current_session_id}_{hash(current_question_text)}" in st.session_state:
-                    st.session_state[f"show_edit_{current_session_id}_{hash(current_question_text)}"] = False
+with col3:
+    # Navigation buttons
+    nav_col1, nav_col2 = st.columns(2)
+    with nav_col1:
+        prev_disabled = st.session_state.current_question == 0
+        if st.button("← Previous Topic", 
+                    disabled=prev_disabled,
+                    key="bottom_prev_btn",
+                    use_container_width=True):
+            if not prev_disabled:
+                st.session_state.current_question -= 1
+                st.session_state.editing = False
+                st.session_state.current_question_override = None
                 st.rerun()
-        else:
-            st.button("❌ Cancel", key="cancel_disabled", disabled=True, use_container_width=True)
     
-    with col3:
-        # Navigation buttons
-        nav_col1, nav_col2 = st.columns(2)
-        with nav_col1:
-            prev_disabled = st.session_state.current_question == 0
-            if st.button("← Previous Topic", 
-                        disabled=prev_disabled,
-                        key="bottom_prev_btn",
-                        use_container_width=True):
-                if not prev_disabled:
-                    st.session_state.current_question -= 1
-                    st.session_state.editing = False
-                    st.session_state.current_question_override = None
-                    # Clear edit flag
-                    if f"show_edit_{current_session_id}_{hash(current_question_text)}" in st.session_state:
-                        st.session_state[f"show_edit_{current_session_id}_{hash(current_question_text)}"] = False
-                    st.rerun()
-        
-        with nav_col2:
-            next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
-            if st.button("Next Topic →", 
-                        disabled=next_disabled,
-                        key="bottom_next_btn",
-                        use_container_width=True):
-                if not next_disabled:
-                    st.session_state.current_question += 1
-                    st.session_state.editing = False
-                    st.session_state.current_question_override = None
-                    # Clear edit flag
-                    if f"show_edit_{current_session_id}_{hash(current_question_text)}" in st.session_state:
-                        st.session_state[f"show_edit_{current_session_id}_{hash(current_question_text)}"] = False
-                    st.rerun()
+    with nav_col2:
+        next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
+        if st.button("Next Topic →", 
+                    disabled=next_disabled,
+                    key="bottom_next_btn",
+                    use_container_width=True):
+            if not next_disabled:
+                st.session_state.current_question += 1
+                st.session_state.editing = False
+                st.session_state.current_question_override = None
+                st.rerun()
+
+# Session Progress
+st.divider()
+progress_info = get_progress_info(current_session_id)
+st.markdown(f"""
+<div class="progress-container">
+<div class="progress-header">📊 Session Progress</div>
+<div class="progress-status">{progress_info['emoji']} {progress_info['progress_percent']:.0f}% complete • {progress_info['remaining_words']} words remaining</div>
+<div class="progress-bar-container">
+<div class="progress-bar-fill" style="width: {min(progress_info['progress_percent'], 100)}%; background-color: {progress_info['color']};"></div>
+</div>
+<div style="text-align: center; font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
+{progress_info['current_count']} / {progress_info['target']} words
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+if st.button("✏️ Change Word Target", key="edit_word_target_bottom", use_container_width=True):
+    st.session_state.editing_word_target = not st.session_state.editing_word_target
+    st.rerun()
+
+if st.session_state.editing_word_target:
+    st.markdown('<div class="edit-target-box">', unsafe_allow_html=True)
+    st.write("**Change Word Target**")
+    new_target = st.number_input(
+        "Target words for this session:",
+        min_value=100,
+        max_value=5000,
+        value=progress_info['target'],
+        key="target_edit_input_bottom",
+        label_visibility="collapsed"
+    )
+    col_save, col_cancel = st.columns(2)
+    with col_save:
+        if st.button("💾 Save", key="save_word_target_bottom", type="primary", use_container_width=True):
+            st.session_state.responses[current_session_id]["word_target"] = new_target
+            save_user_data(st.session_state.user_id, st.session_state.responses)
+            st.session_state.editing_word_target = False
+            st.rerun()
+    with col_cancel:
+        if st.button("❌ Cancel", key="cancel_word_target_bottom", use_container_width=True):
+            st.session_state.editing_word_target = False
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Footer Stats
+st.divider()
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    total_words_all_sessions = sum(calculate_author_word_count(s["id"]) for s in SESSIONS)
+    st.metric("Total Words", f"{total_words_all_sessions}")
+with col2:
+    # Count unique questions answered across all sessions
+    unique_questions_all = set()
+    for session in SESSIONS:
+        session_id = session["id"]
+        session_data = st.session_state.responses.get(session_id, {})
+        for question_text, answer_data in session_data.get("questions", {}).items():
+            unique_questions_all.add((session_id, question_text))
+    
+    completed_sessions = sum(1 for s in SESSIONS if len([q for (sid, q) in unique_questions_all if sid == s["id"]]) == len(s["questions"]))
+    st.metric("Completed Sessions", f"{completed_sessions}/{len(SESSIONS)}")
+with col3:
+    total_topics_answered = len(unique_questions_all)
+    total_all_topics = sum(len(s["questions"]) for s in SESSIONS)
+    st.metric("Topics Explored", f"{total_topics_answered}/{total_all_topics}")
+with col4:
+    # Count total answers
+    total_answers_all = 0
+    for session in SESSIONS:
+        session_id = session["id"]
+        session_data = st.session_state.responses.get(session_id, {})
+        total_answers_all += len(session_data.get("questions", {}))
+    st.metric("Total Answers", f"{total_answers_all}")
+
 # ============================================================================
 # FOOTER
 # ============================================================================
