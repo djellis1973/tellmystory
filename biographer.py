@@ -1814,17 +1814,8 @@ else:
     st.markdown("### ✍️ Write Your Answer")
 
 # ── SINGLE LARGE ANSWER BOX ──────────────────────────────────────────────────
-# Get current answer text - show existing answer if we have one AND we're not editing
+# ALWAYS start with EMPTY Update Your Answer box
 current_answer_text = ""
-if existing_answer and not st.session_state.get('editing', False):
-    # When we have an existing answer and NOT editing, show it in the Update box
-    current_answer_text = existing_answer['answer']
-elif st.session_state.get('editing', False) and st.session_state.get('original_text'):
-    # When editing, show the text being edited
-    current_answer_text = st.session_state.original_text
-else:
-    # For new answers or after navigation, start empty
-    current_answer_text = ""
 
 # Big answer box with auto-correct functionality
 answer_container = st.container()
@@ -1833,14 +1824,14 @@ with answer_container:
     # Text area for writing - size depends on context
     if existing_answer:
         height = 150  # Smaller for updates
-        placeholder = "Add to your answer here... (your existing answer is shown above)"
+        placeholder = "Add to your answer here..."
     else:
         height = 300  # Larger for new answers
         placeholder = "Write your detailed story here. You can write as much as you want. Press Enter for new paragraphs..."
     
     user_input = st.text_area(
         "",
-        value=current_answer_text,
+        value=current_answer_text,  # ALWAYS EMPTY
         height=height,
         placeholder=placeholder,
         key="single_answer_box",
@@ -1900,13 +1891,16 @@ with col1:
             if st.session_state.get('editing', False):
                 # Editing mode - REPLACE the answer
                 save_response_single(current_session_id, current_question_text, final_text)
-                st.session_state.editing = False
                 action = "updated"
             else:
                 # Adding mode - COMBINE with existing answer
                 if existing_answer:
-                    # Combine new text with existing answer
-                    combined_text = existing_answer['answer'] + "\n\n" + final_text
+                    # Combine new text with existing answer (smooth integration)
+                    combined_text = existing_answer['answer']
+                    if combined_text.strip().endswith(('.', '!', '?')):
+                        combined_text += " " + final_text
+                    else:
+                        combined_text += ". " + final_text
                 else:
                     # No existing answer, just save new text
                     combined_text = final_text
@@ -1936,7 +1930,8 @@ with col1:
                     print(f"Error getting AI reflection: {e}")
                     st.session_state.ai_reflection = ""
             
-            # Clear editing state but keep AI reflection
+            # Clear editing state and Update box
+            st.session_state.editing = False
             st.session_state.current_answer = ""
             st.session_state.original_text = ""
             
