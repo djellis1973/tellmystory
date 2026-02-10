@@ -14,6 +14,7 @@ import string
 import base64
 import pandas as pd
 import sys
+import time  # Added for save delay
 
 # Add current directory to path to import modules
 sys.path.append('.')
@@ -382,8 +383,12 @@ def save_response(session_id, question, answer):
     if not user_id or user_id == "":
         return False
     
+    # FIX: Preserve formatting by not processing newlines
+    # Store the answer exactly as entered
+    formatted_answer = answer
+    
     if st.session_state.user_account:
-        word_count = len(re.findall(r'\w+', answer))
+        word_count = len(re.findall(r'\w+', formatted_answer))
         if "stats" not in st.session_state.user_account:
             st.session_state.user_account["stats"] = {}
         st.session_state.user_account["stats"]["total_words"] = st.session_state.user_account["stats"].get("total_words", 0) + word_count
@@ -421,8 +426,9 @@ def save_response(session_id, question, answer):
         }
     
     # Store only one answer per question (overwrite if exists)
+    # FIX: Store with original formatting
     st.session_state.responses[session_id]["questions"][question] = {
-        "answer": answer,
+        "answer": formatted_answer,  # Use formatted answer directly
         "question": question,
         "timestamp": datetime.now().isoformat(),
         "answer_index": 1  # Always 1 since only one answer per question
@@ -1390,71 +1396,142 @@ if current_session_id in st.session_state.responses:
     if current_question_text in st.session_state.responses[current_session_id]["questions"]:
         existing_answer = st.session_state.responses[current_session_id]["questions"][current_question_text]["answer"]
 
-# Large text area (3x bigger - 600px height instead of 200px)
-user_input = st.text_area(
-    "Type your answer here...",
-    value=existing_answer,
-    key=f"answer_box_{current_session_id}_{hash(current_question_text)}",
-    height=600,
-    placeholder="Write your detailed response here...",
-    label_visibility="visible"
-)
+# FIX: Add explicit edit mode state
+if f"editing_{current_session_id}_{hash(current_question_text)}" not in st.session_state:
+    st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"] = not bool(existing_answer)
 
-# Auto-correct as user types (simulated with a button for now)
-if user_input and user_input != existing_answer:
-    # In a real implementation, you'd want to use on_change with debouncing
-    # For now, we'll auto-correct when Save is clicked
-    pass
-
-# Action buttons
-col1, col2, col3 = st.columns([1, 1, 2])
-
-with col1:
-    if st.button("💾 Save", key="save_answer", type="primary", use_container_width=True):
-        if user_input:
-            # Auto-correct before saving
-            corrected_text = auto_correct_text(user_input)
-            save_response(current_session_id, current_question_text, corrected_text)
-            st.success("Answer saved!")
+# Show either the answer or edit interface
+if existing_answer and not st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"]:
+    # Display saved answer
+    st.markdown("### Your Saved Answer:")
+    st.markdown(f'<div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #4CAF50; white-space: pre-wrap;">{existing_answer}</div>', unsafe_allow_html=True)
+    
+    # Action buttons when viewing
+    col_view1, col_view2, col_view3 = st.columns([1, 1, 2])
+    
+    with col_view1:
+        if st.button("✏️ Edit Answer", key="edit_answer_view", type="primary", use_container_width=True):
+            st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"] = True
             st.rerun()
-        else:
-            st.warning("Please write something before saving!")
-
-with col2:
-    if existing_answer:
-        if st.button("🗑️ Delete", key="delete_answer", type="secondary", use_container_width=True):
+    
+    with col_view2:
+        if st.button("🗑️ Delete", key="delete_answer_view", type="secondary", use_container_width=True):
             if delete_response(current_session_id, current_question_text):
                 st.success("Answer deleted!")
                 st.rerun()
-    else:
-        st.button("🗑️ Delete", key="delete_disabled", disabled=True, use_container_width=True)
-
-with col3:
-    # Navigation buttons
-    nav_col1, nav_col2 = st.columns(2)
-    with nav_col1:
-        prev_disabled = st.session_state.current_question == 0
-        if st.button("← Previous Topic", 
-                    disabled=prev_disabled,
-                    key="bottom_prev_btn",
-                    use_container_width=True):
-            if not prev_disabled:
-                st.session_state.current_question -= 1
-                st.session_state.editing = False
-                st.session_state.current_question_override = None
-                st.rerun()
     
-    with nav_col2:
-        next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
-        if st.button("Next Topic →", 
-                    disabled=next_disabled,
-                    key="bottom_next_btn",
-                    use_container_width=True):
-            if not next_disabled:
-                st.session_state.current_question += 1
-                st.session_state.editing = False
-                st.session_state.current_question_override = None
+    with col_view3:
+        # Navigation buttons when viewing
+        nav_col1, nav_col2 = st.columns(2)
+        with nav_col1:
+            prev_disabled = st.session_state.current_question == 0
+            if st.button("← Previous Topic", 
+                        disabled=prev_disabled,
+                        key="view_prev_btn",
+                        use_container_width=True):
+                if not prev_disabled:
+                    st.session_state.current_question -= 1
+                    st.session_state.editing = False
+                    st.session_state.current_question_override = None
+                    # Reset edit state for new question
+                    st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"] = False
+                    st.rerun()
+        
+        with nav_col2:
+            next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
+            if st.button("Next Topic →", 
+                        disabled=next_disabled,
+                        key="view_next_btn",
+                        use_container_width=True):
+                if not next_disabled:
+                    st.session_state.current_question += 1
+                    st.session_state.editing = False
+                    st.session_state.current_question_override = None
+                    # Reset edit state for new question
+                    st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"] = False
+                    st.rerun()
+
+else:
+    # Edit interface
+    # Large text area (3x bigger - 600px height instead of 200px)
+    user_input = st.text_area(
+        "Type your answer here...",
+        value=existing_answer,
+        key=f"answer_box_{current_session_id}_{hash(current_question_text)}",
+        height=600,
+        placeholder="Write your detailed response here...",
+        label_visibility="visible"
+    )
+    
+    # FIX: Add explicit save status
+    save_status = st.empty()
+    
+    # Action buttons
+    col1, col2, col3 = st.columns([1, 1, 2])
+    
+    with col1:
+        if st.button("💾 Save", key="save_answer", type="primary", use_container_width=True):
+            if user_input:
+                # Show saving message
+                save_status.info("🔄 Saving...")
+                
+                # Auto-correct before saving
+                corrected_text = auto_correct_text(user_input)
+                
+                # FIX: Save with formatting preserved
+                if save_response(current_session_id, current_question_text, corrected_text):
+                    # Show success message
+                    save_status.success("✅ Answer saved successfully!")
+                    
+                    # Exit edit mode
+                    st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"] = False
+                    
+                    # Small delay to show success message before rerun
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    save_status.error("❌ Failed to save answer")
+            else:
+                st.warning("Please write something before saving!")
+    
+    with col2:
+        if existing_answer:
+            if st.button("❌ Cancel", key="cancel_edit", type="secondary", use_container_width=True):
+                st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"] = False
                 st.rerun()
+        else:
+            st.button("❌ Cancel", key="cancel_disabled", disabled=True, use_container_width=True)
+    
+    with col3:
+        # Navigation buttons
+        nav_col1, nav_col2 = st.columns(2)
+        with nav_col1:
+            prev_disabled = st.session_state.current_question == 0
+            if st.button("← Previous Topic", 
+                        disabled=prev_disabled,
+                        key="bottom_prev_btn",
+                        use_container_width=True):
+                if not prev_disabled:
+                    st.session_state.current_question -= 1
+                    st.session_state.editing = False
+                    st.session_state.current_question_override = None
+                    # Reset edit state for new question
+                    st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"] = False
+                    st.rerun()
+        
+        with nav_col2:
+            next_disabled = st.session_state.current_question >= len(current_session["questions"]) - 1
+            if st.button("Next Topic →", 
+                        disabled=next_disabled,
+                        key="bottom_next_btn",
+                        use_container_width=True):
+                if not next_disabled:
+                    st.session_state.current_question += 1
+                    st.session_state.editing = False
+                    st.session_state.current_question_override = None
+                    # Reset edit state for new question
+                    st.session_state[f"editing_{current_session_id}_{hash(current_question_text)}"] = False
+                    st.rerun()
 
 # Session Progress
 st.divider()
@@ -1529,91 +1606,6 @@ with col4:
         session_data = st.session_state.responses.get(session_id, {})
         total_answers_all += len(session_data.get("questions", {}))
     st.metric("Total Answers", f"{total_answers_all}")
-
-# ============================================================================
-# SECTION: BIOGRAPHY FORMATTER EXPORT
-# ============================================================================
-st.divider()
-st.subheader("📘 Biography Formatter")
-
-# Get the current user's data
-current_user = st.session_state.get('user_id', '')
-export_data = []
-
-# Prepare data for export
-for session in SESSIONS:
-    session_id = session["id"]
-    session_data = st.session_state.responses.get(session_id, {})
-    if session_data.get("questions"):
-        for question_text, answer_data in session_data["questions"].items():
-            export_data.append({
-                "question": question_text,
-                "answer": answer_data["answer"],
-                "timestamp": answer_data["timestamp"],
-                "answer_index": 1,
-                "session_id": session_id,
-                "session_title": session["title"]
-            })
-
-if current_user and current_user != "" and export_data:
-    # Count total stories
-    total_stories = len(export_data)
-    
-    # Create JSON data for the publisher in the CORRECT FORMAT
-    json_data = json.dumps({
-        "user": current_user,
-        "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
-        "stories": export_data,
-        "export_date": datetime.now().isoformat(),
-        "summary": {
-            "total_stories": total_stories,
-            "total_sessions": len(set(s['session_id'] for s in export_data))
-        }
-    }, indent=2)
-    
-    st.success(f"✅ **{total_stories} stories ready for formatting!**")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### 🖨️ Format Biography")
-        st.markdown(f"""
-        Generate a professionally formatted biography from your stories.
-        
-        Your formatted biography will include:
-        • Professional formatting
-        • Table of contents
-        • All your stories organized
-        • Ready to print or share
-        """)
-    
-    with col2:
-        st.markdown("#### 🔐 Save to Your Vault")
-        st.markdown("""
-        **After formatting your biography:**
-        
-        1. Generate your biography
-        2. Download the formatted PDF
-        3. Save it to your secure vault
-        
-        Your vault preserves important documents forever.
-        """)
-    
-    # Backup download
-    with st.expander("📥 Download Raw Data (Backup)"):
-        st.download_button(
-            label="Download Stories as JSON",
-            data=json_data,
-            file_name=f"{current_user}_stories.json",
-            mime="application/json",
-            use_container_width=True
-        )
-        st.caption("Use this for backup or to share with others")
-        
-elif current_user and current_user != "":
-    st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
-else:
-    st.info("👤 **Please log in to format your biography**")
 
 # ============================================================================
 # FOOTER
