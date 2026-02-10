@@ -375,32 +375,9 @@ def save_user_data(user_id, responses_data):
         print(f"Error saving user data for {user_id}: {e}")
         return False
 
-# ── Prompt Builder ────────────────────────────────────────────────────────────
-def get_system_prompt():
-    # Check if we have sessions loaded
-    if not SESSIONS or st.session_state.current_session >= len(SESSIONS):
-        return "No sessions available. Please check your CSV file."
-    
-    current_session = SESSIONS[st.session_state.current_session]
-    current_question = (
-        st.session_state.current_question_override
-        or current_session["questions"][st.session_state.current_question]
-    )
-    
-    # Always use ghostwriter mode (removed toggle, default to True)
-    return f"""ROLE: You are a senior literary biographer with multiple award-winning books to your name.
-CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
-CURRENT TOPIC: "{current_question}"
-YOUR APPROACH:
-1. Listen like an archivist
-2. Think in scenes, sensory details, and emotional truth
-3. Find the story that needs to be told
-
-Tone: Literary but not pretentious. Serious but not solemn."""
-
-# ── Core Functions (FIXED VERSION FOR MULTIPLE ANSWERS) ──────────────────────
-def save_response(session_id, question, answer, answer_index=None):
-    """Save a response. If answer_index is None, auto-increment to allow multiple answers."""
+# ── Core Functions (SIMPLIFIED - ONE ANSWER PER QUESTION) ────────────────────
+def save_response(session_id, question, answer):
+    """Save a response for a question (only one answer per question)"""
     user_id = st.session_state.user_id
     if not user_id or user_id == "":
         return False
@@ -443,118 +420,36 @@ def save_response(session_id, question, answer, answer_index=None):
             "word_target": session_data.get("word_target", DEFAULT_WORD_TARGET)
         }
     
-    # Generate a unique key for this answer
-    if answer_index is not None:
-        # Use provided answer index
-        answer_key = f"{question}_answer_{answer_index}"
-    else:
-        # Check if this question already has answers
-        existing_answers = []
-        for key in st.session_state.responses[session_id]["questions"].keys():
-            if question in key and key.startswith(f"{question}_answer_"):
-                try:
-                    idx = int(key.split('_answer_')[1])
-                    existing_answers.append(idx)
-                except:
-                    continue
-        
-        if existing_answers:
-            next_index = max(existing_answers) + 1
-        else:
-            next_index = 1
-        answer_key = f"{question}_answer_{next_index}"
-        answer_index = next_index
-    
-    st.session_state.responses[session_id]["questions"][answer_key] = {
+    # Store only one answer per question (overwrite if exists)
+    st.session_state.responses[session_id]["questions"][question] = {
         "answer": answer,
-        "question": question,  # Store the original question
+        "question": question,
         "timestamp": datetime.now().isoformat(),
-        "answer_index": answer_index
+        "answer_index": 1  # Always 1 since only one answer per question
     }
     
     return save_user_data(user_id, st.session_state.responses)
 
-def delete_response(session_id, question, answer_index):
-    """Delete a specific response by its answer_index"""
+def delete_response(session_id, question):
+    """Delete the response for a question"""
     user_id = st.session_state.user_id
     if not user_id or user_id == "":
         return False
     
-    answer_key = f"{question}_answer_{answer_index}"
-    
     if session_id in st.session_state.responses:
-        if answer_key in st.session_state.responses[session_id]["questions"]:
+        if question in st.session_state.responses[session_id]["questions"]:
             # Remove from responses
-            del st.session_state.responses[session_id]["questions"][answer_key]
-            
-            # Clean up conversation
-            if session_id in st.session_state.session_conversations:
-                if question in st.session_state.session_conversations[session_id]:
-                    # Find and remove the conversation entry for this answer
-                    conversation = st.session_state.session_conversations[session_id][question]
-                    # We need to find which conversation entries correspond to this answer
-                    # This is tricky because conversation entries don't store answer_index
-                    # We'll just rebuild the conversation from remaining answers
-                    rebuild_conversation_from_answers(session_id, question)
+            del st.session_state.responses[session_id]["questions"][question]
             
             # Save changes
             return save_user_data(user_id, st.session_state.responses)
     
     return False
 
-def rebuild_conversation_from_answers(session_id, question):
-    """Rebuild conversation from remaining answers"""
-    if session_id not in st.session_state.session_conversations:
-        st.session_state.session_conversations[session_id] = {}
-    
-    # Start with welcome message
-    welcome_msg = f"""Let's explore this topic in detail: {question}\n\n"""
-    if st.session_state.current_question_override and st.session_state.current_question_override.startswith("Vignette:"):
-        welcome_msg += "📝 Vignette Mode: Write a short, focused story about this specific moment or memory."
-    elif st.session_state.current_question_override:
-        welcome_msg += "✨ Custom Topic: Write about whatever comes to mind!"
-    else:
-        welcome_msg += "Take your time with this—good biographies are built from thoughtful reflection."
-    
-    conversation = [{"role": "assistant", "content": welcome_msg}]
-    
-    # Add remaining answers
-    session_data = st.session_state.responses.get(session_id, {})
-    for answer_key, answer_data in session_data.get("questions", {}).items():
-        if "question" in answer_data and answer_data["question"] == question:
-            conversation.append({
-                "role": "user",
-                "content": answer_data["answer"],
-                "answer_index": answer_data.get("answer_index", 1)
-            })
-            # Add AI response placeholder
-            conversation.append({
-                "role": "assistant",
-                "content": f"Thank you for sharing this perspective. You can add more memories about this topic."
-            })
-        elif question in answer_key and '_answer_' in answer_key:
-            # For backward compatibility
-            try:
-                answer_index = int(answer_key.split('_answer_')[1]) if '_answer_' in answer_key else 1
-                conversation.append({
-                    "role": "user",
-                    "content": answer_data["answer"],
-                    "answer_index": answer_index
-                })
-                # Add AI response placeholder
-                conversation.append({
-                    "role": "assistant",
-                    "content": f"Thank you for sharing this perspective. You can add more memories about this topic."
-                })
-            except:
-                pass
-    
-    st.session_state.session_conversations[session_id][question] = conversation
-
 def calculate_author_word_count(session_id):
     total_words = 0
     session_data = st.session_state.responses.get(session_id, {})
-    for answer_key, answer_data in session_data.get("questions", {}).items():
+    for question, answer_data in session_data.get("questions", {}).items():
         if answer_data.get("answer"):
             total_words += len(re.findall(r'\w+', answer_data["answer"]))
     return total_words
@@ -590,7 +485,7 @@ def get_progress_info(session_id):
     }
     
 def auto_correct_text(text):
-    # Always enabled (removed toggle, default to True)
+    # Always enabled
     if not text:
         return text
     try:
@@ -902,11 +797,7 @@ default_state = {
     "current_session": 0,
     "current_question": 0,
     "responses": {},
-    "session_conversations": {},
-    "editing": None,
-    "edit_text": "",
-    "ghostwriter_mode": True,  # Always true now
-    "spellcheck_enabled": True,  # Always true now
+    "editing": False,
     "editing_word_target": False,
     "confirming_clear": None,
     "data_loaded": False,
@@ -948,8 +839,6 @@ if SESSIONS:
                 "completed": False,
                 "word_target": session.get("word_target", DEFAULT_WORD_TARGET)
             }
-        if session_id not in st.session_state.session_conversations:
-            st.session_state.session_conversations[session_id] = {}
 
 if st.session_state.logged_in and st.session_state.user_id and not st.session_state.data_loaded:
     user_data = load_user_data(st.session_state.user_id)
@@ -1232,27 +1121,14 @@ with st.sidebar:
     
     st.divider()
     
-    # 2. Sessions - FIXED: Show multiple answers count
+    # 2. Sessions
     st.header("📖 Sessions")
     for i, session in enumerate(SESSIONS):
         session_id = session["id"]
         session_data = st.session_state.responses.get(session_id, {})
         
-        # Count unique questions answered (not total answers)
-        unique_questions = set()
-        total_answers = 0
-        for answer_key, answer_data in session_data.get("questions", {}).items():
-            total_answers += 1
-            if "question" in answer_data:
-                unique_questions.add(answer_data["question"])
-            else:
-                # For backward compatibility
-                if '_answer_' in answer_key:
-                    unique_questions.add(answer_key.split('_answer_')[0])
-                else:
-                    unique_questions.add(answer_key)
-        
-        responses_count = len(unique_questions)
+        # Count questions answered
+        responses_count = len(session_data.get("questions", {}))
         total_questions = len(session["questions"])
         
         # Traffic light system
@@ -1266,20 +1142,18 @@ with st.sidebar:
         if i == st.session_state.current_session:
             status = "▶️"  # Current session
         
-        # Show multiple answers count
         button_text = f"{status} {session_id}: {session['title']}"
         
         if st.button(button_text, key=f"select_session_{i}", use_container_width=True):
             st.session_state.current_session = i
             st.session_state.current_question = 0
-            st.session_state.editing = None
+            st.session_state.editing = False
             st.session_state.current_question_override = None
-            st.session_state.image_prompt_mode = False
             st.rerun()
     
     st.divider()
     
-    # 3. Vignettes - FIXED: Now stacked
+    # 3. Vignettes
     st.header("✨ Vignettes")
     if st.button("📝 New Vignette", use_container_width=True):
         st.session_state.show_vignette_modal = True
@@ -1291,7 +1165,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 4. Session Management - FIXED: Now stacked
+    # 4. Session Management
     st.header("📖 Session Management")
     if st.button("📋 All Sessions", use_container_width=True):
         st.session_state.show_session_manager = True
@@ -1303,59 +1177,42 @@ with st.sidebar:
     
     st.divider()
     
-    # 5. Export Options - REMOVED PUBLISH BIOGRAPHY BUTTON
+    # 5. Export Options
     st.subheader("📤 Export Options")
     
-    # Count total answers (not just questions)
+    # Count total answers
     total_answers = 0
     for session_id, session_data in st.session_state.responses.items():
         total_answers += len(session_data.get("questions", {}))
     st.caption(f"Total answers: {total_answers}")
     
     if st.session_state.logged_in and st.session_state.user_id:
-        # FIXED: Prepare data in the EXACT format the publisher expects
+        # Prepare data for export
         export_data = []
-        story_index = 1
         
         for session in SESSIONS:
             session_id = session["id"]
             session_data = st.session_state.responses.get(session_id, {})
             if session_data.get("questions"):
-                # Group answers by question
-                questions_dict = {}
-                for answer_key, answer_data in session_data["questions"].items():
-                    question_text = answer_data.get("question", answer_key.split('_answer_')[0] if '_answer_' in answer_key else answer_key)
-                    if question_text not in questions_dict:
-                        questions_dict[question_text] = []
-                    
-                    questions_dict[question_text].append({
+                for question_text, answer_data in session_data["questions"].items():
+                    export_data.append({
+                        "question": question_text,
                         "answer": answer_data["answer"],
                         "timestamp": answer_data["timestamp"],
-                        "answer_index": answer_data.get("answer_index", 1)
+                        "answer_index": 1,
+                        "session_id": session_id,
+                        "session_title": session["title"]
                     })
-                
-                # Add each answer as a separate story entry for the publisher
-                for question_text, answers in questions_dict.items():
-                    for answer_data in answers:
-                        export_data.append({
-                            "question": question_text,
-                            "answer": answer_data["answer"],
-                            "timestamp": answer_data["timestamp"],
-                            "answer_index": answer_data.get("answer_index", 1),
-                            "session_id": session_id,
-                            "session_title": session["title"]
-                        })
-                        story_index += 1
         
         if export_data:
             # Count total stories
             total_stories = len(export_data)
             
-            # Create complete export data in the EXACT format publisher expects
+            # Create complete export data
             complete_data = {
                 "user": st.session_state.user_id,
                 "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
-                "stories": export_data,  # This is now a LIST, not a dict
+                "stories": export_data,
                 "export_date": datetime.now().isoformat(),
                 "summary": {
                     "total_stories": total_stories,
@@ -1365,7 +1222,7 @@ with st.sidebar:
             
             json_data = json.dumps(complete_data, indent=2)
             
-            # Stacked download buttons - REMOVED PUBLISH BIOGRAPHY BUTTON
+            # Stacked download buttons
             stories_only = {
                 "user": st.session_state.user_id,
                 "stories": export_data,
@@ -1399,7 +1256,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 6. Clear Data - FIXED: Now stacked with disclaimer AND FIXED TO CLEAR PROPERLY
+    # 6. Clear Data
     st.subheader("⚠️ Clear Data")
     st.caption("**WARNING: This action cannot be undone - you will lose all your work!**")
     
@@ -1412,9 +1269,6 @@ with st.sidebar:
             try:
                 # Clear responses
                 st.session_state.responses[current_session_id]["questions"] = {}
-                # Clear conversations
-                if current_session_id in st.session_state.session_conversations:
-                    st.session_state.session_conversations[current_session_id] = {}
                 save_user_data(st.session_state.user_id, st.session_state.responses)
                 st.session_state.confirming_clear = None
                 st.rerun()
@@ -1436,8 +1290,6 @@ with st.sidebar:
                 for session in SESSIONS:
                     session_id = session["id"]
                     st.session_state.responses[session_id]["questions"] = {}
-                # Clear all conversations
-                st.session_state.session_conversations = {}
                 save_user_data(st.session_state.user_id, st.session_state.responses)
                 st.session_state.confirming_clear = None
                 st.rerun()
@@ -1479,28 +1331,15 @@ else:
 
 st.markdown("---")
 
-# NEW EXACT LAYOUT AS REQUESTED
 # Row 1: Session title and topics explored with progress bar
 col1, col2 = st.columns([3, 1])
 
 with col1:
     st.subheader(f"Session {current_session_id}: {current_session['title']}")
     
-    # Count unique questions answered and total answers
+    # Count questions answered
     session_data = st.session_state.responses.get(current_session_id, {})
-    unique_questions = set()
-    total_answers = 0
-    for answer_key, answer_data in session_data.get("questions", {}).items():
-        total_answers += 1
-        if "question" in answer_data:
-            unique_questions.add(answer_data["question"])
-        else:
-            if '_answer_' in answer_key:
-                unique_questions.add(answer_key.split('_answer_')[0])
-            else:
-                unique_questions.add(answer_key)
-    
-    topics_answered = len(unique_questions)
+    topics_answered = len(session_data.get("questions", {}))
     total_topics = len(current_session["questions"])
     
     # Progress bar for topics
@@ -1508,10 +1347,6 @@ with col1:
         topic_progress = topics_answered / total_topics
         st.progress(min(topic_progress, 1.0))
         st.caption(f"📝 Topics explored: {topics_answered}/{total_topics} ({topic_progress*100:.0f}%)")
-    
-    # Show multiple answers count if applicable
-    if total_answers > topics_answered:
-        st.caption(f"📚 Total answers: {total_answers} (+{total_answers - topics_answered} additional answers)")
 
 with col2:
     # Show custom topic indicator if needed
@@ -1524,9 +1359,6 @@ with col2:
         current_topic = st.session_state.current_question + 1
         total_topics = len(current_session["questions"])
         st.markdown(f'<div class="question-counter" style="margin-top: 1rem;">Topic {current_topic} of {total_topics}</div>', unsafe_allow_html=True)
-
-# Professional Ghostwriter Mode tag (always shown since it's always enabled)
-st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode</p>', unsafe_allow_html=True)
 
 # The main question
 st.markdown(f"""
@@ -1548,196 +1380,56 @@ else:
     else:
         st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
 
-# ── Conversation Area (UPDATED FOR MULTIPLE ANSWERS WITH DELETE BUTTON) ──────
-if current_session_id not in st.session_state.session_conversations:
-    st.session_state.session_conversations[current_session_id] = {}
-
-# Get all answers for this question
-all_answers_for_question = []
-for answer_key, answer_data in st.session_state.responses.get(current_session_id, {}).get("questions", {}).items():
-    if "question" in answer_data and answer_data["question"] == current_question_text:
-        all_answers_for_question.append({
-            "key": answer_key,
-            "data": answer_data,
-            "index": answer_data.get("answer_index", 1)
-        })
-    elif current_question_text in answer_key and '_answer_' in answer_key:
-        # For backward compatibility
-        all_answers_for_question.append({
-            "key": answer_key,
-            "data": answer_data,
-            "index": int(answer_key.split('_answer_')[1]) if '_answer_' in answer_key else 1
-        })
-
-# Sort answers by index
-all_answers_for_question.sort(key=lambda x: x["index"])
-
-# Initialize conversation if needed
-if current_question_text not in st.session_state.session_conversations[current_session_id]:
-    st.session_state.session_conversations[current_session_id][current_question_text] = []
-    
-    # Add welcome message
-    welcome_msg = f"""Let's explore this topic in detail: {current_question_text}\n\n"""
-    if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
-        welcome_msg += "📝 Vignette Mode: Write a short, focused story about this specific moment or memory."
-    elif question_source == "custom":
-        welcome_msg += "✨ Custom Topic: Write about whatever comes to mind!"
-    else:
-        welcome_msg += "Take your time with this—good biographies are built from thoughtful reflection."
-    
-    st.session_state.session_conversations[current_session_id][current_question_text].append({
-        "role": "assistant",
-        "content": welcome_msg
-    })
-    
-    # Add existing answers to conversation
-    for answer_info in all_answers_for_question:
-        st.session_state.session_conversations[current_session_id][current_question_text].append({
-            "role": "user",
-            "content": answer_info["data"]["answer"],
-            "answer_index": answer_info["index"]
-        })
-        # Add AI response placeholder
-        st.session_state.session_conversations[current_session_id][current_question_text].append({
-            "role": "assistant",
-            "content": f"Thank you for sharing this perspective. You can add more memories about this topic."
-        })
-
-conversation = st.session_state.session_conversations[current_session_id][current_question_text]
-
-# Show how many answers exist for this question
-if all_answers_for_question:
-    st.info(f"📚 You have {len(all_answers_for_question)} answer(s) for this question. Add another perspective below:")
-
-# Display conversation WITH DELETE BUTTONS
-for i, message in enumerate(conversation):
-    if message["role"] == "assistant":
-        with st.chat_message("assistant", avatar="👔"):
-            st.markdown(message["content"])
-    elif message["role"] == "user":
-        is_editing = (st.session_state.editing == (current_session_id, current_question_text, i))
-        with st.chat_message("user", avatar="👤"):
-            if is_editing:
-                new_text = st.text_area(
-                    "Edit your answer:",
-                    value=st.session_state.edit_text,
-                    key=f"edit_area_{current_session_id}_{hash(current_question_text)}_{i}",
-                    height=150,
-                    label_visibility="collapsed"
-                )
-                if new_text:
-                    edit_word_count = len(re.findall(r'\w+', new_text))
-                    st.caption(f"📝 Editing: {edit_word_count} words")
-                    col1, col2, col3 = st.columns([1, 1, 1])
-                    with col1:
-                        if st.button("✓ Save", key=f"save_{current_session_id}_{hash(current_question_text)}_{i}", type="primary", use_container_width=True):
-                            # Always use auto-correct (removed toggle)
-                            new_text = auto_correct_text(new_text)
-                            conversation[i]["content"] = new_text
-                            st.session_state.session_conversations[current_session_id][current_question_text] = conversation
-                            
-                            # Find and update the corresponding answer
-                            answer_index = message.get("answer_index", 1)
-                            save_response(current_session_id, current_question_text, new_text, answer_index=answer_index)
-                            
-                            st.session_state.editing = None
-                            st.rerun()
-                    with col2:
-                        if st.button("✕ Cancel", key=f"cancel_{current_session_id}_{hash(current_question_text)}_{i}", use_container_width=True):
-                            st.session_state.editing = None
-                            st.rerun()
-                    with col3:
-                        answer_index = message.get("answer_index", 1)
-                        if st.button("🗑️ Delete", key=f"delete_{current_session_id}_{hash(current_question_text)}_{i}", type="secondary", use_container_width=True):
-                            if delete_response(current_session_id, current_question_text, answer_index):
-                                st.success("Answer deleted!")
-                                st.rerun()
-            else:
-                col1, col2 = st.columns([5, 1])
-                with col1:
-                    st.markdown(message["content"])
-                    word_count = len(re.findall(r'\w+', message["content"]))
-                    answer_num = message.get("answer_index", "?")
-                    st.caption(f"📝 Answer #{answer_num} • {word_count} words")
-                with col2:
-                    button_col1, button_col2 = st.columns(2)
-                    with button_col1:
-                        if st.button("✏️", key=f"edit_{st.session_state.current_session}_{hash(current_question_text)}_{i}", help="Edit this answer"):
-                            st.session_state.editing = (current_session_id, current_question_text, i)
-                            st.session_state.edit_text = message["content"]
-                            st.rerun()
-                    with button_col2:
-                        answer_index = message.get("answer_index", 1)
-                        if st.button("🗑️", key=f"del_{st.session_state.current_session}_{hash(current_question_text)}_{i}", help="Delete this answer"):
-                            if delete_response(current_session_id, current_question_text, answer_index):
-                                st.success("Answer deleted!")
-                                st.rerun()
-
-# BIG ANSWER BOX with SAVE button (not arrow) - CHANGED AS REQUESTED
+# ── SINGLE DATA ENTRY BOX (3x bigger, no AI reflections) ─────────────────────
 st.write("")
 st.write("")
+
+# Get existing answer for this question
+existing_answer = ""
+if current_session_id in st.session_state.responses:
+    if current_question_text in st.session_state.responses[current_session_id]["questions"]:
+        existing_answer = st.session_state.responses[current_session_id]["questions"][current_question_text]["answer"]
+
+# Large text area (3x bigger - 600px height instead of 200px)
 user_input = st.text_area(
-    "Type your long-form answer here...",
-    key="long_form_answer",
-    height=200,
-    placeholder="Write your detailed response here. This is where you should write your full story...",
+    "Type your answer here...",
+    value=existing_answer,
+    key=f"answer_box_{current_session_id}_{hash(current_question_text)}",
+    height=600,
+    placeholder="Write your detailed response here...",
     label_visibility="visible"
 )
 
-# CHANGED: Save button instead of arrow button
-col1, col2 = st.columns([1, 3])
+# Auto-correct as user types (simulated with a button for now)
+if user_input and user_input != existing_answer:
+    # In a real implementation, you'd want to use on_change with debouncing
+    # For now, we'll auto-correct when Save is clicked
+    pass
+
+# Action buttons
+col1, col2, col3 = st.columns([1, 1, 2])
+
 with col1:
-    if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
+    if st.button("💾 Save", key="save_answer", type="primary", use_container_width=True):
         if user_input:
-            # Always use auto-correct (removed toggle)
-            user_input = auto_correct_text(user_input)
-            
-            # Determine answer index
-            next_answer_index = len(all_answers_for_question) + 1
-            
-            # Add user message to conversation
-            conversation.append({
-                "role": "user", 
-                "content": user_input,
-                "answer_index": next_answer_index
-            })
-            
-            # Save the response with auto-incremented index
-            save_response(current_session_id, current_question_text, user_input)
-            
-            with st.chat_message("assistant", avatar="👔"):
-                with st.spinner("Reflecting on your story..."):
-                    try:
-                        conversation_history = conversation[:-1]
-                        messages_for_api = [
-                            {"role": "system", "content": get_system_prompt()},
-                            *conversation_history,
-                            {"role": "user", "content": user_input}
-                        ]
-                        # Always use ghostwriter mode settings (removed toggle)
-                        temperature = 0.8
-                        max_tokens = 400
-                        response = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=messages_for_api,
-                            temperature=temperature,
-                            max_tokens=max_tokens
-                        )
-                        ai_response = response.choices[0].message.content
-                        if question_source == "custom" and st.session_state.current_question_override.startswith("Vignette:"):
-                            ai_response += f"\n\n📝 **Vignette Note:** This is a great start for your vignette! Keep adding details about this specific memory."
-                        st.markdown(ai_response)
-                        conversation.append({"role": "assistant", "content": ai_response})
-                    except Exception as e:
-                        error_msg = "Thank you for sharing that. Your response has been saved."
-                        st.markdown(error_msg)
-                        conversation.append({"role": "assistant", "content": error_msg})
-            st.session_state.session_conversations[current_session_id][current_question_text] = conversation
+            # Auto-correct before saving
+            corrected_text = auto_correct_text(user_input)
+            save_response(current_session_id, current_question_text, corrected_text)
+            st.success("Answer saved!")
             st.rerun()
         else:
             st.warning("Please write something before saving!")
 
 with col2:
+    if existing_answer:
+        if st.button("🗑️ Delete", key="delete_answer", type="secondary", use_container_width=True):
+            if delete_response(current_session_id, current_question_text):
+                st.success("Answer deleted!")
+                st.rerun()
+    else:
+        st.button("🗑️ Delete", key="delete_disabled", disabled=True, use_container_width=True)
+
+with col3:
     # Navigation buttons
     nav_col1, nav_col2 = st.columns(2)
     with nav_col1:
@@ -1748,9 +1440,8 @@ with col2:
                     use_container_width=True):
             if not prev_disabled:
                 st.session_state.current_question -= 1
-                st.session_state.editing = None
+                st.session_state.editing = False
                 st.session_state.current_question_override = None
-                st.session_state.image_prompt_mode = False
                 st.rerun()
     
     with nav_col2:
@@ -1761,9 +1452,8 @@ with col2:
                     use_container_width=True):
             if not next_disabled:
                 st.session_state.current_question += 1
-                st.session_state.editing = None
+                st.session_state.editing = False
                 st.session_state.current_question_override = None
-                st.session_state.image_prompt_mode = False
                 st.rerun()
 
 # Session Progress
@@ -1822,9 +1512,8 @@ with col2:
     for session in SESSIONS:
         session_id = session["id"]
         session_data = st.session_state.responses.get(session_id, {})
-        for answer_key, answer_data in session_data.get("questions", {}).items():
-            if "question" in answer_data:
-                unique_questions_all.add((session_id, answer_data["question"]))
+        for question_text, answer_data in session_data.get("questions", {}).items():
+            unique_questions_all.add((session_id, question_text))
     
     completed_sessions = sum(1 for s in SESSIONS if len([q for (sid, q) in unique_questions_all if sid == s["id"]]) == len(s["questions"]))
     st.metric("Completed Sessions", f"{completed_sessions}/{len(SESSIONS)}")
@@ -1833,7 +1522,7 @@ with col3:
     total_all_topics = sum(len(s["questions"]) for s in SESSIONS)
     st.metric("Topics Explored", f"{total_topics_answered}/{total_all_topics}")
 with col4:
-    # Count total answers (not just topics)
+    # Count total answers
     total_answers_all = 0
     for session in SESSIONS:
         session_id = session["id"]
@@ -1842,7 +1531,7 @@ with col4:
     st.metric("Total Answers", f"{total_answers_all}")
 
 # ============================================================================
-# SECTION: BIOGRAPHY FORMATTER EXPORT (UPDATED FOR MULTIPLE ANSWERS WITH FIXED FORMAT)
+# SECTION: BIOGRAPHY FORMATTER EXPORT
 # ============================================================================
 st.divider()
 st.subheader("📘 Biography Formatter")
@@ -1851,19 +1540,17 @@ st.subheader("📘 Biography Formatter")
 current_user = st.session_state.get('user_id', '')
 export_data = []
 
-# Prepare data for export (LIST FORMAT for publisher)
+# Prepare data for export
 for session in SESSIONS:
     session_id = session["id"]
     session_data = st.session_state.responses.get(session_id, {})
     if session_data.get("questions"):
-        for answer_key, answer_data in session_data["questions"].items():
-            question_text = answer_data.get("question", answer_key.split('_answer_')[0] if '_answer_' in answer_key else answer_key)
-            
+        for question_text, answer_data in session_data["questions"].items():
             export_data.append({
                 "question": question_text,
                 "answer": answer_data["answer"],
                 "timestamp": answer_data["timestamp"],
-                "answer_index": answer_data.get("answer_index", 1),
+                "answer_index": 1,
                 "session_id": session_id,
                 "session_title": session["title"]
             })
@@ -1876,7 +1563,7 @@ if current_user and current_user != "" and export_data:
     json_data = json.dumps({
         "user": current_user,
         "user_profile": st.session_state.user_account.get('profile', {}) if st.session_state.user_account else {},
-        "stories": export_data,  # LIST format, not dict
+        "stories": export_data,
         "export_date": datetime.now().isoformat(),
         "summary": {
             "total_stories": total_stories,
@@ -1942,7 +1629,6 @@ Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} �
     st.caption(footer_info)
 else:
     st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id}")
-
 
 
 
