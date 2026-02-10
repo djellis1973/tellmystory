@@ -434,7 +434,15 @@ def save_response(session_id, question, answer):
         "answer_index": 1  # Always 1 since only one answer per question
     }
     
-    return save_user_data(user_id, st.session_state.responses)
+    # FIX: CRITICAL - Also update the actual data file immediately
+    success = save_user_data(user_id, st.session_state.responses)
+    
+    # FIX: Also reload the data to ensure consistency
+    if success:
+        # Clear the data loaded flag so it reloads on next render
+        st.session_state.data_loaded = False
+        
+    return success
 
 def delete_response(session_id, question):
     """Delete the response for a question"""
@@ -448,7 +456,14 @@ def delete_response(session_id, question):
             del st.session_state.responses[session_id]["questions"][question]
             
             # Save changes
-            return save_user_data(user_id, st.session_state.responses)
+            success = save_user_data(user_id, st.session_state.responses)
+            
+            # FIX: Also reload the data to ensure consistency
+            if success:
+                # Clear the data loaded flag so it reloads on next render
+                st.session_state.data_loaded = False
+                
+            return success
     
     return False
 
