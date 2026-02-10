@@ -1,7 +1,7 @@
-# biographer.py – Tell My Story App (Complete Working Version)
+# biographer.py – Tell My Story App (Simplified Version)
 import streamlit as st
 import json
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from openai import OpenAI
 import os
 import re
@@ -13,7 +13,6 @@ import secrets
 import string
 import base64
 import pandas as pd
-import uuid
 import sys
 
 # Add current directory to path to import modules
@@ -137,7 +136,6 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
             st.warning("⚠️ No sessions found in CSV file")
             return []
         
-        # REMOVED: st.success(f"✅ Loaded {len(sessions_list)} sessions from CSV")
         return sessions_list
         
     except Exception as e:
@@ -146,42 +144,6 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
 
 # Load sessions ONCE at startup
 SESSIONS = load_sessions_from_csv()
-
-# ── Historical events – CSV only ──────────────────────────────────────────────
-def create_default_events_csv():
-    if not os.path.exists("historical_events.csv"):
-        with open("historical_events.csv", "w", encoding="utf-8") as f:
-            f.write("year_range,event,category,region,description\n")
-
-def load_historical_events():
-    create_default_events_csv()
-    try:
-        df = pd.read_csv("historical_events.csv")
-        events_by_decade = {}
-        for _, row in df.iterrows():
-            decade = str(row['year_range']).strip()
-            events_by_decade.setdefault(decade, []).append(row.to_dict())
-        return events_by_decade
-    except:
-        return {}
-
-def get_events_for_birth_year(birth_year):
-    events_by_decade = load_historical_events()
-    relevant = []
-    start_decade = (birth_year // 10) * 10
-    current_year = datetime.now().year
-    for decade in range(start_decade, current_year + 10, 10):
-        key = f"{decade}s"
-        if key in events_by_decade:
-            for ev in events_by_decade[key]:
-                approx_year = int(key.replace('s', '')) + 5
-                age = approx_year - birth_year
-                if age >= 0:
-                    ev_copy = ev.copy()
-                    ev_copy['approx_age'] = age
-                    relevant.append(ev_copy)
-    relevant.sort(key=lambda x: x.get('year_range', '9999'))
-    return relevant[:20]
 
 # ── Email Configuration ───────────────────────────────────────────────────────
 EMAIL_CONFIG = {
@@ -371,14 +333,15 @@ def logout_user():
         'show_vignette_manager', 'custom_topic_input', 'show_custom_topic_modal',
         'show_topic_browser', 'show_session_manager', 'show_session_creator',
         'editing_custom_session', 'show_vignette_detail', 'selected_vignette_id',
-        'editing_vignette_id', 'selected_vignette_for_session', 'show_image_gallery'
+        'editing_vignette_id', 'selected_vignette_for_session', 'published_vignette',
+        'show_image_gallery'
     ]
     for key in keys:
         st.session_state.pop(key, None)
     st.query_params.clear()
     st.rerun()
 
-# ── Storage & Streak ──────────────────────────────────────────────────────────
+# ── Storage ──────────────────────────────────────────────────────────────────
 def get_user_filename(user_id):
     filename_hash = hashlib.md5(user_id.encode()).hexdigest()[:8]
     return f"user_data_{filename_hash}.json"
@@ -412,59 +375,6 @@ def save_user_data(user_id, responses_data):
         print(f"Error saving user data for {user_id}: {e}")
         return False
 
-def update_streak():
-    if "streak_days" not in st.session_state:
-        st.session_state.streak_days = 1
-    if "last_active" not in st.session_state:
-        st.session_state.last_active = date.today().isoformat()
-    if "total_writing_days" not in st.session_state:
-        st.session_state.total_writing_days = 1
-    today = date.today().isoformat()
-    if st.session_state.last_active != today:
-        try:
-            last_date = date.fromisoformat(st.session_state.last_active)
-            today_date = date.today()
-            days_diff = (today_date - last_date).days
-            if days_diff == 1:
-                st.session_state.streak_days += 1
-            elif days_diff > 1:
-                st.session_state.streak_days = 1
-            st.session_state.total_writing_days += 1
-            st.session_state.last_active = today
-        except:
-            st.session_state.last_active = today
-
-def get_streak_emoji(streak_days):
-    if streak_days >= 30:
-        return "🔥🔥🔥"
-    elif streak_days >= 7:
-        return "🔥🔥"
-    elif streak_days >= 3:
-        return "🔥"
-    else:
-        return "✨"
-
-def estimate_year_from_text(text):
-    try:
-        years = re.findall(r'\b(19\d{2}|20\d{2})\b', text)
-        if years:
-            return int(years[0])
-    except:
-        pass
-    return None
-
-def save_jot(text, estimated_year=None):
-    if "quick_jots" not in st.session_state:
-        st.session_state.quick_jots = []
-    jot_data = {
-        "text": text,
-        "year": estimated_year,
-        "date": datetime.now().isoformat(),
-        "word_count": len(re.findall(r'\w+', text))
-    }
-    st.session_state.quick_jots.append(jot_data)
-    return True
-
 # ── Prompt Builder ────────────────────────────────────────────────────────────
 def get_system_prompt():
     # Check if we have sessions loaded
@@ -476,48 +386,17 @@ def get_system_prompt():
         st.session_state.current_question_override
         or current_session["questions"][st.session_state.current_question]
     )
-    historical_context = ""
-    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
-        try:
-            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
-            events = get_events_for_birth_year(birth_year)
-            if events:
-                context_lines = []
-                for event in events[:5]:
-                    event_text = f"- {event['event']} ({event['year_range']})"
-                    if event.get('region') == 'UK':
-                        event_text += " [UK]"
-                    if 'approx_age' in event and event['approx_age'] >= 0:
-                        event_text += f" (Age {event['approx_age']})"
-                    context_lines.append(event_text)
-                historical_context = f"""
-HISTORICAL CONTEXT (Born {birth_year}):
-During their lifetime, these major events occurred:
-{chr(10).join(context_lines)}
-Consider how these historical moments might have shaped their experiences and perspectives.
-"""
-        except Exception as e:
-            print(f"Error generating historical context: {e}")
     
-    if st.session_state.ghostwriter_mode:
-        return f"""ROLE: You are a senior literary biographer with multiple award-winning books to your name.
+    # Always use ghostwriter mode (removed toggle, default to True)
+    return f"""ROLE: You are a senior literary biographer with multiple award-winning books to your name.
 CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
 CURRENT TOPIC: "{current_question}"
-{historical_context}
 YOUR APPROACH:
 1. Listen like an archivist
 2. Think in scenes, sensory details, and emotional truth
-3. Connect personal stories to historical context when relevant
-4. Find the story that needs to be told
+3. Find the story that needs to be told
 
 Tone: Literary but not pretentious. Serious but not solemn."""
-    else:
-        return f"""You are a warm, professional biographer helping document a life story.
-CURRENT SESSION: Session {current_session['id']}: {current_session['title']}
-CURRENT TOPIC: "{current_question}"
-{historical_context}
-
-Tone: Kind, curious, professional"""
 
 # ── Core Functions (FIXED VERSION FOR MULTIPLE ANSWERS) ──────────────────────
 def save_response(session_id, question, answer, answer_index=None):
@@ -525,8 +404,6 @@ def save_response(session_id, question, answer, answer_index=None):
     user_id = st.session_state.user_id
     if not user_id or user_id == "":
         return False
-    
-    update_streak()
     
     if st.session_state.user_account:
         word_count = len(re.findall(r'\w+', answer))
@@ -713,7 +590,8 @@ def get_progress_info(session_id):
     }
     
 def auto_correct_text(text):
-    if not text or not st.session_state.spellcheck_enabled:
+    # Always enabled (removed toggle, default to True)
+    if not text:
         return text
     try:
         response = client.chat.completions.create(
@@ -1027,23 +905,12 @@ default_state = {
     "session_conversations": {},
     "editing": None,
     "edit_text": "",
-    "ghostwriter_mode": True,
-    "spellcheck_enabled": True,
+    "ghostwriter_mode": True,  # Always true now
+    "spellcheck_enabled": True,  # Always true now
     "editing_word_target": False,
     "confirming_clear": None,
     "data_loaded": False,
     "current_question_override": None,
-    "quick_jots": [],
-    "current_jot": "",
-    "show_jots": False,
-    "historical_events_loaded": False,
-    "show_image_upload": False,
-    "image_prompt_mode": False,
-    "selected_images_for_prompt": [],
-    "image_description": "",
-    "streak_days": 1,
-    "last_active": date.today().isoformat(),
-    "total_writing_days": 1,
     "show_vignette_modal": False,
     "vignette_topic": "",
     "vignette_content": "",
@@ -1307,13 +1174,6 @@ if not st.session_state.logged_in:
     show_login_signup()
     st.stop()
 
-if not st.session_state.historical_events_loaded:
-    try:
-        events = load_historical_events()
-        st.session_state.historical_events_loaded = True
-    except:
-        pass
-
 # Show modals in priority order
 if st.session_state.show_vignette_detail:
     show_vignette_detail()
@@ -1346,7 +1206,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# ── Sidebar (SIMPLIFIED - REMOVED REQUESTED FEATURES) ─────────────────────────
 with st.sidebar:
     # Add "Tell My Story" header at top of sidebar
     st.markdown("""
@@ -1372,21 +1232,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 2. Writing Streak
-    st.header("🔥 Writing Streak")
-    streak_emoji = get_streak_emoji(st.session_state.streak_days)
-    st.markdown(f"<div class='streak-flame'>{streak_emoji}</div>", unsafe_allow_html=True)
-    st.markdown(f"**{st.session_state.streak_days} day streak**")
-    st.caption(f"Total writing days: {st.session_state.total_writing_days}")
-    
-    if st.session_state.streak_days >= 7:
-        st.success("🏆 Weekly Writer!")
-    if st.session_state.streak_days >= 30:
-        st.success("🌟 Monthly Master!")
-    
-    st.divider()
-    
-    # 3. Sessions - FIXED: Show multiple answers count
+    # 2. Sessions - FIXED: Show multiple answers count
     st.header("📖 Sessions")
     for i, session in enumerate(SESSIONS):
         session_id = session["id"]
@@ -1433,43 +1279,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 4. Quick Capture
-    st.header("⚡ Quick Capture")
-    with st.expander("💭 Jot Now - Quick Memory", expanded=False):
-        quick_note = st.text_area(
-            "Got a memory? Jot it down:",
-            value="",
-            height=120,
-            placeholder="E.g., 'That summer at grandma's house in 1995...'",
-            key="jot_text_area",
-            label_visibility="collapsed"
-        )
-        
-        # Stacked buttons inside expander
-        if st.button("💾 Save Jot", key="save_jot_btn", use_container_width=True):
-            if quick_note and quick_note.strip():
-                estimated_year = estimate_year_from_text(quick_note)
-                save_jot(quick_note, estimated_year)
-                st.success("Saved! ✨")
-                st.rerun()
-            else:
-                st.warning("Please write something first!")
-        
-        use_disabled = not quick_note or not quick_note.strip()
-        if st.button("📝 Use as Prompt", key="use_jot_btn", use_container_width=True, disabled=use_disabled):
-            st.session_state.current_question_override = quick_note
-            st.info("Ready to write about this!")
-            st.rerun()
-            
-        if st.session_state.get('quick_jots'):
-            st.caption(f"📝 {len(st.session_state.quick_jots)} quick notes saved")
-            if st.button("View Quick Notes", key="view_jots_btn", use_container_width=True):
-                st.session_state.show_jots = True
-                st.rerun()
-    
-    st.divider()
-    
-    # 5. Vignettes - FIXED: Now stacked
+    # 3. Vignettes - FIXED: Now stacked
     st.header("✨ Vignettes")
     if st.button("📝 New Vignette", use_container_width=True):
         st.session_state.show_vignette_modal = True
@@ -1481,30 +1291,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 6. Historical Context
-    st.header("📜 Historical Context")
-    if st.session_state.user_account and st.session_state.user_account['profile'].get('birthdate'):
-        try:
-            birth_year = int(st.session_state.user_account['profile']['birthdate'].split(', ')[-1])
-            events = get_events_for_birth_year(birth_year)
-            if events:
-                st.caption(f"From {birth_year} to present")
-                
-                with st.expander("View Sample Events", expanded=False):
-                    for i, event in enumerate(events[:5]):
-                        region_emoji = "🇬🇧" if event.get('region') == 'UK' else "🌍"
-                        st.markdown(f"**{region_emoji} {event['event']}**")
-                        st.caption(f"{event['year_range']} • {event.get('category', 'General')}")
-                        if i < 4:
-                            st.divider()
-        except:
-            st.info("Add birthdate to see historical context")
-    else:
-        st.info("Add your birthdate to enable historical context")
-    
-    st.divider()
-    
-    # 7. Session Management - FIXED: Now stacked
+    # 4. Session Management - FIXED: Now stacked
     st.header("📖 Session Management")
     if st.button("📋 All Sessions", use_container_width=True):
         st.session_state.show_session_manager = True
@@ -1516,43 +1303,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 8. Topic Management
-    st.header("📚 Topic Management")
-    if st.button("🔍 Browse Topics", use_container_width=True):
-        st.session_state.show_topic_browser = True
-        st.rerun()
-    
-    st.divider()
-    
-    # 9. Interview Style
-    st.header("✍️ Interview Style")
-    ghostwriter_mode = st.toggle(
-        "Professional Ghostwriter Mode",
-        value=st.session_state.ghostwriter_mode,
-        key="ghostwriter_toggle"
-    )
-    if ghostwriter_mode != st.session_state.ghostwriter_mode:
-        st.session_state.ghostwriter_mode = ghostwriter_mode
-        st.rerun()
-    
-    spellcheck_enabled = st.toggle(
-        "Auto Spelling Correction",
-        value=st.session_state.spellcheck_enabled,
-        key="spellcheck_toggle"
-    )
-    if spellcheck_enabled != st.session_state.spellcheck_enabled:
-        st.session_state.spellcheck_enabled = spellcheck_enabled
-        st.rerun()
-    
-    if st.session_state.ghostwriter_mode:
-        st.success("✓ Professional mode active")
-        st.caption("With historical context")
-    else:
-        st.info("Standard mode active")
-    
-    st.divider()
-    
-    # 10. Export Options - FIXED: Updated to handle multiple answers AND FIXED PUBLISHER FORMAT
+    # 5. Export Options - REMOVED PUBLISH BIOGRAPHY BUTTON
     st.subheader("📤 Export Options")
     
     # Count total answers (not just questions)
@@ -1613,13 +1364,8 @@ with st.sidebar:
             }
             
             json_data = json.dumps(complete_data, indent=2)
-            encoded_data = base64.b64encode(json_data.encode()).decode()
             
-            # USE THE ORIGINAL URL FROM YOUR WORKING APP
-            publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
-            publisher_url = f"{publisher_base_url}?data={encoded_data}"
-            
-            # Stacked download buttons - now styled with blue theme
+            # Stacked download buttons - REMOVED PUBLISH BIOGRAPHY BUTTON
             stories_only = {
                 "user": st.session_state.user_id,
                 "stories": export_data,
@@ -1646,16 +1392,6 @@ with st.sidebar:
                 key="download_complete_btn"
             ):
                 pass
-            
-            st.divider()
-            st.markdown(f'''
-            <a href="{publisher_url}" target="_blank">
-            <button class="html-link-btn">
-            🖨️ Publish Biography
-            </button>
-            </a>
-            ''', unsafe_allow_html=True)
-            st.caption("Create a beautiful book with your stories")
         else:
             st.warning("No data to export yet! Start by answering some questions.")
     else:
@@ -1663,7 +1399,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 11. Clear Data - FIXED: Now stacked with disclaimer AND FIXED TO CLEAR PROPERLY
+    # 6. Clear Data - FIXED: Now stacked with disclaimer AND FIXED TO CLEAR PROPERLY
     st.subheader("⚠️ Clear Data")
     st.caption("**WARNING: This action cannot be undone - you will lose all your work!**")
     
@@ -1789,9 +1525,8 @@ with col2:
         total_topics = len(current_session["questions"])
         st.markdown(f'<div class="question-counter" style="margin-top: 1rem;">Topic {current_topic} of {total_topics}</div>', unsafe_allow_html=True)
 
-# Professional Ghostwriter Mode tag
-if st.session_state.ghostwriter_mode:
-    st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode (with historical context)</p>', unsafe_allow_html=True)
+# Professional Ghostwriter Mode tag (always shown since it's always enabled)
+st.markdown('<p class="ghostwriter-tag">Professional Ghostwriter Mode</p>', unsafe_allow_html=True)
 
 # The main question
 st.markdown(f"""
@@ -1896,8 +1631,8 @@ for i, message in enumerate(conversation):
                     col1, col2, col3 = st.columns([1, 1, 1])
                     with col1:
                         if st.button("✓ Save", key=f"save_{current_session_id}_{hash(current_question_text)}_{i}", type="primary", use_container_width=True):
-                            if st.session_state.spellcheck_enabled:
-                                new_text = auto_correct_text(new_text)
+                            # Always use auto-correct (removed toggle)
+                            new_text = auto_correct_text(new_text)
                             conversation[i]["content"] = new_text
                             st.session_state.session_conversations[current_session_id][current_question_text] = conversation
                             
@@ -1954,8 +1689,8 @@ col1, col2 = st.columns([1, 3])
 with col1:
     if st.button("💾 Save Answer", key="save_long_form", type="primary", use_container_width=True):
         if user_input:
-            if st.session_state.spellcheck_enabled:
-                user_input = auto_correct_text(user_input)
+            # Always use auto-correct (removed toggle)
+            user_input = auto_correct_text(user_input)
             
             # Determine answer index
             next_answer_index = len(all_answers_for_question) + 1
@@ -1979,8 +1714,9 @@ with col1:
                             *conversation_history,
                             {"role": "user", "content": user_input}
                         ]
-                        temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
-                        max_tokens = 400 if st.session_state.ghostwriter_mode else 300
+                        # Always use ghostwriter mode settings (removed toggle)
+                        temperature = 0.8
+                        max_tokens = 400
                         response = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=messages_for_api,
@@ -2148,13 +1884,6 @@ if current_user and current_user != "" and export_data:
         }
     }, indent=2)
     
-    # Encode the data for URL
-    encoded_data = base64.b64encode(json_data.encode()).decode()
-    
-    # USE THE ORIGINAL URL FROM YOUR WORKING APP
-    publisher_base_url = "https://deeperbiographer-dny9n2j6sflcsppshrtrmu.streamlit.app/"
-    publisher_url = f"{publisher_base_url}?data={encoded_data}"
-    
     st.success(f"✅ **{total_stories} stories ready for formatting!**")
     
     col1, col2 = st.columns(2)
@@ -2163,8 +1892,6 @@ if current_user and current_user != "" and export_data:
         st.markdown("#### 🖨️ Format Biography")
         st.markdown(f"""
         Generate a professionally formatted biography from your stories.
-        
-        **[📘 Click to Format Biography]({publisher_url})**
         
         Your formatted biography will include:
         • Professional formatting
@@ -2178,11 +1905,9 @@ if current_user and current_user != "" and export_data:
         st.markdown("""
         **After formatting your biography:**
         
-        1. Generate your biography (link on left)
+        1. Generate your biography
         2. Download the formatted PDF
         3. Save it to your secure vault
-        
-        **[💾 Go to Secure Vault](https://digital-legacy-vault-vwvd4eclaeq4hxtcbbshr2.streamlit.app/)**
         
         Your vault preserves important documents forever.
         """)
@@ -2196,7 +1921,7 @@ if current_user and current_user != "" and export_data:
             mime="application/json",
             use_container_width=True
         )
-        st.caption("Use this if the formatter link doesn't work")
+        st.caption("Use this for backup or to share with others")
         
 elif current_user and current_user != "":
     st.info("📝 **Answer some questions first!** Come back here after saving some stories.")
@@ -2212,11 +1937,11 @@ if st.session_state.user_account:
     account_age = (datetime.now() - datetime.fromisoformat(st.session_state.user_account['created_at'])).days
     
     footer_info = f"""
-Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} • 🔥 {st.session_state.streak_days} day streak • 📅 Account Age: {account_age} days
+Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} • 📅 Account Age: {account_age} days
 """
     st.caption(footer_info)
 else:
-    st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
+    st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id}")
 
 
 
