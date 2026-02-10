@@ -519,7 +519,7 @@ CURRENT TOPIC: "{current_question}"
 
 Tone: Kind, curious, professional"""
 
-# ── NEW: Core Functions for SINGLE ANSWER BOX ────────────────────────────────
+# ── Core Functions for SINGLE ANSWER BOX ─────────────────────────────────────
 def save_response_single(session_id, question, answer, answer_index=1):
     """Save a single response. If answer exists, update it."""
     user_id = st.session_state.user_id
@@ -650,7 +650,7 @@ def get_progress_info(session_id):
         "status_text": status_text
     }
 
-# ── NEW: Enhanced auto-correct with paragraph preservation ───────────────────
+# ── Enhanced auto-correct with paragraph preservation ────────────────────────
 def auto_correct_text_enhanced(text, force_correction=False):
     """Enhanced auto-correct that preserves paragraphs and formatting"""
     if not text or not text.strip():
@@ -1024,7 +1024,7 @@ default_state = {
     "selected_vignette_for_session": None,
     "published_vignette": None,
     "show_image_gallery": False,
-    # NEW: State for single answer mode
+    # State for single answer mode
     "current_answer": "",
     "force_correction": False,
     "correction_applied": False,
@@ -1522,7 +1522,7 @@ with st.sidebar:
     st.caption(f"Total answers: {total_answers}")
     
     if st.session_state.logged_in and st.session_state.user_id:
-        # Prepare data for export (LIST format for publisher)
+        # Prepare data for export (LIST FORMAT for publisher)
         export_data = []
         
         for session in SESSIONS:
@@ -1688,7 +1688,7 @@ else:
 
 st.markdown("---")
 
-# NEW EXACT LAYOUT AS REQUESTED - SINGLE ANSWER BOX VERSION
+# SINGLE ANSWER BOX VERSION
 # Row 1: Session title and topics explored with progress bar
 col1, col2 = st.columns([3, 1])
 
@@ -1747,8 +1747,8 @@ else:
     else:
         st.info("✨ **Custom Topic** - Write about whatever comes to mind!")
 
-# ── SINGLE ANSWER BOX AREA ───────────────────────────────────────────────────
-# Load existing answer if any
+# ── YOUR ANSWER SECTION ───────────────────────────────────────────────────────
+# Load existing answer for THIS specific topic
 existing_answer = get_response_single(current_session_id, current_question_text, answer_index=1)
 
 # If we have an existing answer, show it with edit/delete buttons
@@ -1766,6 +1766,7 @@ if existing_answer:
         edit_col, delete_col = st.columns(2)
         with edit_col:
             if st.button("✏️ Edit", key="edit_answer_btn", use_container_width=True):
+                # When editing, populate the Update Your Answer box with existing answer
                 st.session_state.current_answer = existing_answer['answer']
                 st.session_state.original_text = existing_answer['answer']
                 st.session_state.editing = True
@@ -1813,21 +1814,26 @@ else:
     st.markdown("### ✍️ Write Your Answer")
 
 # ── SINGLE LARGE ANSWER BOX ──────────────────────────────────────────────────
-# Get current answer text
-current_answer_text = st.session_state.get('current_answer', '')
-
-# If we're editing and have original text, show it
-if st.session_state.get('editing', False) and not current_answer_text and st.session_state.get('original_text'):
+# Get current answer text - show existing answer if we have one AND we're not editing
+current_answer_text = ""
+if existing_answer and not st.session_state.get('editing', False):
+    # When we have an existing answer and NOT editing, show it in the Update box
+    current_answer_text = existing_answer['answer']
+elif st.session_state.get('editing', False) and st.session_state.get('original_text'):
+    # When editing, show the text being edited
     current_answer_text = st.session_state.original_text
+else:
+    # For new answers or after navigation, start empty
+    current_answer_text = ""
 
 # Big answer box with auto-correct functionality
 answer_container = st.container()
 
 with answer_container:
-    # Text area for writing - SMALLER for "Update Your Answer"
+    # Text area for writing - size depends on context
     if existing_answer:
         height = 150  # Smaller for updates
-        placeholder = "Add to or modify your answer here..."
+        placeholder = "Add to your answer here... (your existing answer is shown above)"
     else:
         height = 300  # Larger for new answers
         placeholder = "Write your detailed story here. You can write as much as you want. Press Enter for new paragraphs..."
@@ -1890,15 +1896,29 @@ with col1:
                 final_text = auto_correct_text_enhanced(user_input)
                 st.session_state.correction_applied = True
             
-            # Save the response
-            save_response_single(current_session_id, current_question_text, final_text)
+            # Check if we're editing or adding
+            if st.session_state.get('editing', False):
+                # Editing mode - REPLACE the answer
+                save_response_single(current_session_id, current_question_text, final_text)
+                st.session_state.editing = False
+                action = "updated"
+            else:
+                # Adding mode - COMBINE with existing answer
+                if existing_answer:
+                    # Combine new text with existing answer
+                    combined_text = existing_answer['answer'] + "\n\n" + final_text
+                else:
+                    # No existing answer, just save new text
+                    combined_text = final_text
+                save_response_single(current_session_id, current_question_text, combined_text)
+                action = "saved"
             
             # Get AI reflection
             with st.spinner("Getting AI reflection and suggestions..."):
                 try:
                     messages_for_api = [
                         {"role": "system", "content": get_system_prompt()},
-                        {"role": "user", "content": final_text}
+                        {"role": "user", "content": final_text if st.session_state.get('editing', False) else combined_text}
                     ]
                     
                     temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
@@ -1917,11 +1937,10 @@ with col1:
                     st.session_state.ai_reflection = ""
             
             # Clear editing state but keep AI reflection
-            st.session_state.editing = False
             st.session_state.current_answer = ""
             st.session_state.original_text = ""
             
-            st.success("Answer saved successfully! ✅")
+            st.success(f"Answer {action} successfully! ✅")
             st.rerun()
 
 with col2:
