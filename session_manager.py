@@ -4,23 +4,93 @@ import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import os
+import pandas as pd
 
 class SessionManager:
     """Manages sessions with grid-based UI and progress tracking"""
     
-    def __init__(self, sessions_data: List[Dict], user_id: str):
-        self.sessions = sessions_data
+    def __init__(self, user_id: str, csv_path: str = "sessions/sessions.csv"):
         self.user_id = user_id
+        self.csv_path = csv_path
         self.progress_file = f"user_progress/{user_id}_progress.json"
         self.custom_sessions_file = f"user_sessions/{user_id}_custom.json"
         self._ensure_directories()
+        self._load_sessions_from_csv()
         self._load_progress()
         self._load_custom_sessions()
+    
+    def _load_sessions_from_csv(self):
+        """Load sessions from CSV file"""
+        try:
+            if os.path.exists(self.csv_path):
+                df = pd.read_csv(self.csv_path)
+                
+                # Group by session_id
+                sessions_dict = {}
+                
+                for session_id, group in df.groupby('session_id'):
+                    session_id_int = int(session_id)
+                    group = group.reset_index(drop=True)
+                    
+                    # Get title (use first row's title or default)
+                    title = f"Session {session_id_int}"
+                    if 'title' in group.columns and not group.empty:
+                        first_title = group.iloc[0]['title']
+                        if pd.notna(first_title) and str(first_title).strip():
+                            title = str(first_title).strip()
+                    
+                    # Get guidance (use first row's guidance)
+                    guidance = ""
+                    if 'guidance' in group.columns and not group.empty:
+                        first_guidance = group.iloc[0]['guidance']
+                        if pd.notna(first_guidance) and str(first_guidance).strip():
+                            guidance = str(first_guidance).strip()
+                    
+                    # Get word target (use first row's word_target or default to 500)
+                    word_target = 500
+                    if 'word_target' in group.columns and not group.empty:
+                        first_target = group.iloc[0]['word_target']
+                        if pd.notna(first_target):
+                            try:
+                                word_target = int(float(first_target))
+                            except:
+                                word_target = 500
+                    
+                    # Get all questions
+                    questions = []
+                    for _, row in group.iterrows():
+                        if 'question' in row and pd.notna(row['question']) and str(row['question']).strip():
+                            questions.append(str(row['question']).strip())
+                    
+                    # Only add session if it has questions
+                    if questions:
+                        sessions_dict[session_id_int] = {
+                            "id": session_id_int,
+                            "title": title,
+                            "guidance": guidance,
+                            "questions": questions,
+                            "completed": False,
+                            "word_target": word_target
+                        }
+                
+                # Convert to list and sort by session_id
+                sessions_list = list(sessions_dict.values())
+                sessions_list.sort(key=lambda x: x['id'])
+                
+                self.sessions = sessions_list
+            else:
+                self.sessions = []
+                st.error(f"CSV file not found: {self.csv_path}")
+                
+        except Exception as e:
+            print(f"Error loading sessions from CSV: {e}")
+            self.sessions = []
     
     def _ensure_directories(self):
         """Create necessary directories"""
         os.makedirs("user_progress", exist_ok=True)
         os.makedirs("user_sessions", exist_ok=True)
+        os.makedirs(os.path.dirname(self.csv_path) if os.path.dirname(self.csv_path) else '.', exist_ok=True)
     
     def _load_progress(self):
         """Load user progress from file"""
@@ -144,7 +214,8 @@ class SessionManager:
             "id": len(self.custom_sessions) + len(self.sessions) + 1000,  # Start custom IDs at 1000
             "title": title,
             "description": description,
-            "topics": topics,
+            "questions": topics,  # Store topics as questions
+            "guidance": description,  # Use description as guidance
             "word_target": word_target,
             "is_custom": True,
             "created_at": datetime.now().isoformat()
@@ -156,11 +227,18 @@ class SessionManager:
     
     def get_all_sessions(self) -> List[Dict]:
         """Get all sessions (standard + custom)"""
-        return self.sessions + self.custom_sessions
+        # FIX: Ensure both are lists before concatenation
+        standard_sessions = self.sessions if isinstance(self.sessions, list) else []
+        custom_sessions = self.custom_sessions if isinstance(self.custom_sessions, list) else []
+        return standard_sessions + custom_sessions
     
     def display_session_grid(self, cols: int = 3, on_session_select=None):
         """Display sessions in a grid format"""
         all_sessions = self.get_all_sessions()
+        
+        if not all_sessions:
+            st.info("No sessions available. Create a custom session to get started!")
+            return
         
         # Create columns for the grid
         columns = st.columns(cols)
@@ -231,6 +309,10 @@ class SessionManager:
             with col2:
                 st.caption(f"📖 {progress.get('word_count', 0)} words")
             
+            # Show topics count for custom sessions
+            if session.get("is_custom") and "questions" in session:
+                st.caption(f"📋 {len(session['questions'])} topics")
+            
             # Action buttons
             if on_session_select:
                 if st.button("Enter Session", key=f"enter_{session_id}", 
@@ -241,36 +323,45 @@ class SessionManager:
     
     def display_session_creator(self):
         """Display interface for creating custom sessions"""
-        with st.expander("➕ Create Custom Session", expanded=False):
-            with st.form("create_session_form"):
-                title = st.text_input("Session Title", 
-                                    placeholder="e.g., 'My College Years' or 'Career Journey'")
-                description = st.text_area("Description (optional)",
-                                         placeholder="Brief description of this session...")
-                
-                # Topics input
-                st.write("Topics (one per line):")
-                topics_text = st.text_area("",
-                                         placeholder="e.g., First day at university\nImportant mentors\nKey projects",
-                                         height=150,
-                                         label_visibility="collapsed")
-                
-                word_target = st.number_input("Word Target", 
-                                            min_value=100, 
-                                            max_value=5000, 
-                                            value=500)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.form_submit_button("Create Session", type="primary", use_container_width=True):
-                        if title.strip():
-                            topics = [t.strip() for t in topics_text.split('\n') if t.strip()]
-                            new_session = self.create_custom_session(title, description, topics, word_target)
-                            st.success(f"Session '{title}' created!")
-                            st.rerun()
-                        else:
-                            st.error("Please enter a session title")
-                
-                with col2:
-                    if st.form_submit_button("Cancel", type="secondary", use_container_width=True):
-                        st.rerun()
+        st.markdown("### Create Custom Session")
+        
+        with st.form("create_session_form"):
+            title = st.text_input("Session Title", 
+                                placeholder="e.g., 'My College Years' or 'Career Journey'")
+            description = st.text_area("Description (optional)",
+                                     placeholder="Brief description of this session...",
+                                     height=100)
+            
+            # Topics input
+            st.write("**Topics/Questions** (one per line):")
+            topics_text = st.text_area("",
+                                     placeholder="e.g., What was your first day like?\nWho were your most important mentors?\nWhat key projects did you work on?",
+                                     height=150,
+                                     label_visibility="collapsed")
+            
+            word_target = st.number_input("Word Target", 
+                                        min_value=100, 
+                                        max_value=5000, 
+                                        value=500)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                submit_button = st.form_submit_button("✅ Create Session", type="primary", use_container_width=True)
+            with col2:
+                cancel_button = st.form_submit_button("❌ Cancel", type="secondary", use_container_width=True)
+            
+            if submit_button:
+                if title.strip():
+                    topics = [t.strip() for t in topics_text.split('\n') if t.strip()]
+                    if not topics:
+                        st.error("Please add at least one topic/question")
+                        return
+                    
+                    new_session = self.create_custom_session(title, description, topics, word_target)
+                    st.success(f"✅ Session '{title}' created with {len(topics)} topics!")
+                    st.rerun()
+                else:
+                    st.error("Please enter a session title")
+            
+            if cancel_button:
+                st.rerun()
