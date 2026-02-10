@@ -650,9 +650,9 @@ def get_progress_info(session_id):
         "status_text": status_text
     }
 
-# ── NEW: Enhanced auto-correct with manual override ──────────────────────────
+# ── NEW: Enhanced auto-correct with paragraph preservation ───────────────────
 def auto_correct_text_enhanced(text, force_correction=False):
-    """Enhanced auto-correct with manual override option"""
+    """Enhanced auto-correct that preserves paragraphs and formatting"""
     if not text or not text.strip():
         return text
     
@@ -666,10 +666,10 @@ def auto_correct_text_enhanced(text, force_correction=False):
             messages=[
                 {
                     "role": "system", 
-                    "content": """Fix spelling, grammar, and formatting in the following text. 
-                    Preserve the original meaning, tone, and voice.
-                    Return only the corrected text.
-                    Keep paragraph breaks and structure intact."""
+                    "content": """Fix spelling and grammar mistakes in the following text. 
+                    Preserve ALL paragraph breaks, line breaks, and formatting exactly as written.
+                    Keep the original structure and organization.
+                    Return only the corrected text with exactly the same paragraph structure."""
                 },
                 {"role": "user", "content": text}
             ],
@@ -681,6 +681,9 @@ def auto_correct_text_enhanced(text, force_correction=False):
         # If the corrected text is empty or very different, return original
         if not corrected_text or len(corrected_text) < len(text) * 0.5:
             return text
+        
+        # Ensure line breaks are preserved by replacing \n with actual line breaks
+        corrected_text = corrected_text.replace('\\n', '\n')
         
         return corrected_text
     except Exception as e:
@@ -1026,6 +1029,7 @@ default_state = {
     "force_correction": False,
     "correction_applied": False,
     "original_text": "",
+    "ai_reflection": "",
 }
 
 for key, value in default_state.items():
@@ -1384,6 +1388,7 @@ with st.sidebar:
             st.session_state.current_question_override = None
             st.session_state.image_prompt_mode = False
             st.session_state.current_answer = ""
+            st.session_state.ai_reflection = ""
             st.rerun()
     
     st.divider()
@@ -1773,16 +1778,36 @@ if existing_answer:
                     st.session_state.current_answer = ""
                     st.session_state.original_text = ""
                     st.session_state.editing = False
+                    st.session_state.ai_reflection = ""
                     st.rerun()
     
-    # Display the answer
+    # Display the answer - PRESERVING PARAGRAPHS
+    answer_display = existing_answer['answer'].replace('\n', '<br>')
     st.markdown(f"""
-    <div class="answer-display">
-    {existing_answer['answer']}
+    <div class="answer-display" style="
+        min-height: 300px;
+        max-height: 500px;
+        overflow-y: auto;
+        padding: 1.5rem;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+        margin-bottom: 1.5rem;
+        white-space: pre-wrap;
+        line-height: 1.6;
+    ">
+    {answer_display}
     </div>
     """, unsafe_allow_html=True)
-    
+
+# ── AI REFLECTION & SUGGESTIONS (between Your Answer and Update Your Answer) ──
+if existing_answer and st.session_state.ai_reflection:
+    st.markdown("#### Reflection & Suggestions")
+    st.markdown(st.session_state.ai_reflection)
     st.divider()
+
+# ── UPDATE YOUR ANSWER SECTION ───────────────────────────────────────────────
+if existing_answer:
     st.markdown("### ✍️ Update Your Answer")
 else:
     st.markdown("### ✍️ Write Your Answer")
@@ -1799,12 +1824,19 @@ if st.session_state.get('editing', False) and not current_answer_text and st.ses
 answer_container = st.container()
 
 with answer_container:
-    # Text area for writing
+    # Text area for writing - SMALLER for "Update Your Answer"
+    if existing_answer:
+        height = 150  # Smaller for updates
+        placeholder = "Add to or modify your answer here..."
+    else:
+        height = 300  # Larger for new answers
+        placeholder = "Write your detailed story here. You can write as much as you want. Press Enter for new paragraphs..."
+    
     user_input = st.text_area(
-        "Write your complete answer here:",
+        "",
         value=current_answer_text,
-        height=300,
-        placeholder="Write your detailed story here. You can write as much as you want. The AI will help guide you and suggest additional angles to explore as you write...",
+        height=height,
+        placeholder=placeholder,
         key="single_answer_box",
         label_visibility="collapsed"
     )
@@ -1849,7 +1881,8 @@ col1, col2, col3 = st.columns([1, 2, 1])
 
 with col1:
     # Save button
-    if st.button("💾 Save Answer", key="save_single_answer", type="primary", use_container_width=True):
+    save_disabled = not user_input
+    if st.button("💾 Save Answer", key="save_single_answer", type="primary", use_container_width=True, disabled=save_disabled):
         if user_input:
             # Apply auto-correction if enabled
             final_text = user_input
@@ -1860,15 +1893,36 @@ with col1:
             # Save the response
             save_response_single(current_session_id, current_question_text, final_text)
             
-            # Clear editing state
+            # Get AI reflection
+            with st.spinner("Getting AI reflection and suggestions..."):
+                try:
+                    messages_for_api = [
+                        {"role": "system", "content": get_system_prompt()},
+                        {"role": "user", "content": final_text}
+                    ]
+                    
+                    temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
+                    max_tokens = 500 if st.session_state.ghostwriter_mode else 400
+                    
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages_for_api,
+                        temperature=temperature,
+                        max_tokens=max_tokens
+                    )
+                    
+                    st.session_state.ai_reflection = response.choices[0].message.content
+                except Exception as e:
+                    print(f"Error getting AI reflection: {e}")
+                    st.session_state.ai_reflection = ""
+            
+            # Clear editing state but keep AI reflection
             st.session_state.editing = False
             st.session_state.current_answer = ""
             st.session_state.original_text = ""
             
             st.success("Answer saved successfully! ✅")
             st.rerun()
-        else:
-            st.warning("Please write something before saving!")
 
 with col2:
     # Navigation buttons
@@ -1886,6 +1940,7 @@ with col2:
                 st.session_state.image_prompt_mode = False
                 st.session_state.current_answer = ""
                 st.session_state.original_text = ""
+                st.session_state.ai_reflection = ""
                 st.rerun()
     
     with nav_col2:
@@ -1901,6 +1956,7 @@ with col2:
                 st.session_state.image_prompt_mode = False
                 st.session_state.current_answer = ""
                 st.session_state.original_text = ""
+                st.session_state.ai_reflection = ""
                 st.rerun()
 
 with col3:
@@ -1911,52 +1967,6 @@ with col3:
         st.session_state.editing = False
         st.session_state.correction_applied = False
         st.rerun()
-
-# ── AI GUIDANCE SECTION (Q&A as you go) ──────────────────────────────────────
-if existing_answer:
-    st.divider()
-    st.markdown("### 🤖 AI Guidance")
-    
-    # Show AI reflection and suggestions
-    with st.chat_message("assistant", avatar="👔"):
-        with st.spinner("Reflecting on your story and suggesting angles to explore..."):
-            try:
-                # Prepare conversation for AI
-                messages_for_api = [
-                    {"role": "system", "content": get_system_prompt()},
-                    {"role": "user", "content": existing_answer['answer']}
-                ]
-                
-                temperature = 0.8 if st.session_state.ghostwriter_mode else 0.7
-                max_tokens = 500 if st.session_state.ghostwriter_mode else 400
-                
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=messages_for_api,
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-                
-                ai_response = response.choices[0].message.content
-                
-                # Format the response nicely
-                st.markdown("#### Reflection & Suggestions")
-                st.markdown(ai_response)
-                
-                # Add prompt for further exploration
-                st.markdown("---")
-                st.markdown("""
-                **💡 Want to explore more?** 
-                
-                You can:
-                1. **Edit your answer above** to add more details
-                2. **Click 'Next Topic'** to move to the next question
-                3. **Save any additional thoughts** in the answer box
-                """)
-                
-            except Exception as e:
-                st.error(f"Error getting AI guidance: {e}")
-                st.info("Your answer has been saved. You can continue writing or move to the next topic.")
 
 # Session Progress
 st.divider()
@@ -2147,4 +2157,3 @@ Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} �
     st.caption(footer_info)
 else:
     st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id} • 🔥 {st.session_state.streak_days} day streak")
-
