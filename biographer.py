@@ -1764,4 +1764,250 @@ if existing_answer:
     with col2:
         # Edit and Delete buttons
         edit_col, delete_col = st.columns(2)
-        with
+        with edit_col:
+            if st.button("✏️ Edit", key="edit_existing_btn", use_container_width=True):
+                st.session_state.editing = True
+                st.session_state.edit_text = existing_answer['answer']
+                st.rerun()
+        with delete_col:
+            if st.button("🗑️ Delete", key="delete_existing_btn", use_container_width=True):
+                if delete_response_single(current_session_id, current_question_text, answer_index=1):
+                    st.success("Answer deleted!")
+                    st.rerun()
+    
+    # Show the existing answer
+    st.markdown(f"""
+    <div class="answer-display-box">
+    {existing_answer['answer'].replace('\n', '<br>')}
+    </div>
+    """, unsafe_allow_html=True)
+
+# If we're editing or there's no existing answer, show the text area
+if st.session_state.editing or not existing_answer:
+    # Get the current text to edit
+    if st.session_state.editing:
+        current_text = st.session_state.edit_text
+    else:
+        current_text = ""
+    
+    # Create a dynamic key for the text box - unique per topic
+    text_box_key = f"answer_box_{current_session_id}_{hash(current_question_text)}"
+    
+    # Text area for writing answer - always start empty
+    user_input = st.text_area(
+        label="Write your answer below:",
+        value="",  # Always empty - text from one topic won't appear in another
+        height=300,
+        placeholder="Start writing your story here... (Your text will be auto-saved as you type)",
+        key=text_box_key,
+        label_visibility="collapsed"
+    )
+    
+    # Word count display
+    word_count = len(re.findall(r'\w+', user_input))
+    progress_info = get_progress_info(current_session_id)
+    
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        st.caption(f"📝 **{word_count} words** written")
+        if progress_info["target"] > 0:
+            st.caption(f"🎯 **{progress_info['remaining_words']} words** to reach {progress_info['target']} words")
+    
+    with col2:
+        # Save button
+        if st.button("💾 Save Answer", type="primary", use_container_width=True):
+            if user_input and user_input.strip():
+                # Apply auto-correct if enabled
+                if st.session_state.spellcheck_enabled:
+                    user_input = auto_correct_text_enhanced(user_input)
+                
+                # Save the answer
+                if save_response_single(current_session_id, current_question_text, user_input):
+                    st.success("Answer saved successfully!")
+                    st.session_state.editing = False
+                    st.session_state.edit_text = ""
+                    st.rerun()
+            else:
+                st.warning("Please write something before saving!")
+    
+    with col3:
+        # Force Correction button - FIXED: doesn't reference text box key
+        if st.button("🔧 Force Correction", type="secondary", use_container_width=True):
+            if user_input and user_input.strip():
+                # Store the original text
+                st.session_state.original_text = user_input
+                # Apply correction
+                corrected = auto_correct_text_enhanced(user_input, force_correction=True)
+                
+                # Clear the text box by resetting the session state for that key
+                st.session_state[text_box_key] = corrected
+                
+                st.session_state.correction_applied = True
+                st.success("Correction applied! Review and save if you like it.")
+                st.rerun()
+            else:
+                st.warning("Please write something first!")
+    
+    # Show correction status
+    if st.session_state.correction_applied:
+        st.info("✓ Correction applied. Review the text above and click 'Save Answer' if you want to keep it.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Keep Correction", type="primary", use_container_width=True):
+                # Save the corrected text
+                if save_response_single(current_session_id, current_question_text, user_input):
+                    st.session_state.correction_applied = False
+                    st.success("Saved with correction!")
+                    st.rerun()
+        with col2:
+            if st.button("↩️ Revert to Original", type="secondary", use_container_width=True):
+                # Revert to original text
+                if hasattr(st.session_state, 'original_text'):
+                    st.session_state[text_box_key] = st.session_state.original_text
+                st.session_state.correction_applied = False
+                st.rerun()
+    
+    # Cancel button if editing
+    if st.session_state.editing:
+        if st.button("❌ Cancel Edit", type="secondary", use_container_width=True):
+            st.session_state.editing = False
+            st.session_state.edit_text = ""
+            st.rerun()
+
+# Navigation for regular questions (not custom topics)
+if question_source == "regular":
+    st.markdown("---")
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+    
+    with col1:
+        if st.button("⏮️ Previous Topic", use_container_width=True):
+            if st.session_state.current_question > 0:
+                st.session_state.current_question -= 1
+            else:
+                # Go to previous session if we're at the first question
+                if st.session_state.current_session > 0:
+                    st.session_state.current_session -= 1
+                    st.session_state.current_question = len(SESSIONS[st.session_state.current_session]["questions"]) - 1
+            st.session_state.current_question_override = None
+            st.session_state.editing = False
+            st.session_state.edit_text = ""
+            st.rerun()
+    
+    with col2:
+        if st.button("↺ Reset Topic", use_container_width=True):
+            st.session_state.editing = False
+            st.session_state.edit_text = ""
+            st.rerun()
+    
+    with col3:
+        if st.button("⏭️ Next Topic", use_container_width=True):
+            if st.session_state.current_question < len(current_session["questions"]) - 1:
+                st.session_state.current_question += 1
+            else:
+                # Go to next session if we're at the last question
+                if st.session_state.current_session < len(SESSIONS) - 1:
+                    st.session_state.current_session += 1
+                    st.session_state.current_question = 0
+            st.session_state.current_question_override = None
+            st.session_state.editing = False
+            st.session_state.edit_text = ""
+            st.rerun()
+    
+    with col4:
+        # Add vignette option in navigation
+        if st.button("✨ Add Vignette", use_container_width=True):
+            st.session_state.show_vignette_modal = True
+            st.rerun()
+
+# For custom topics, show different navigation
+else:
+    st.markdown("---")
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button("↺ Return to Regular Topics", use_container_width=True):
+            st.session_state.current_question_override = None
+            st.session_state.editing = False
+            st.session_state.edit_text = ""
+            st.rerun()
+    
+    with col2:
+        if st.button("✨ Add Another Vignette", use_container_width=True):
+            st.session_state.show_vignette_modal = True
+            st.rerun()
+
+# Session progress section
+st.markdown("---")
+st.subheader("📊 Session Progress")
+
+# Get progress info
+progress_info = get_progress_info(current_session_id)
+
+# Progress bar with color
+st.markdown(f"""
+<div style="margin-bottom: 1rem;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+        <span>Your writing progress</span>
+        <span style="color: {progress_info['color']}; font-weight: bold;">{progress_info['emoji']} {progress_info['status_text']}</span>
+    </div>
+    <div style="background-color: #ecf0f1; border-radius: 10px; height: 20px; overflow: hidden;">
+        <div style="background-color: {progress_info['color']}; width: {min(progress_info['progress_percent'], 100)}%; height: 100%; border-radius: 10px; transition: width 0.5s ease;"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.9em; color: #7f8c8d;">
+        <span>{progress_info['current_count']} words written</span>
+        <span>Target: {progress_info['target']} words</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Word target editing
+if st.session_state.editing_word_target:
+    new_target = st.number_input(
+        "New word target:",
+        min_value=0,
+        max_value=10000,
+        value=progress_info['target'],
+        step=100
+    )
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("✅ Set Target", use_container_width=True):
+            st.session_state.responses[current_session_id]["word_target"] = new_target
+            save_user_data(st.session_state.user_id, st.session_state.responses)
+            st.session_state.editing_word_target = False
+            st.success(f"Word target set to {new_target}!")
+            st.rerun()
+    with col2:
+        if st.button("❌ Cancel", use_container_width=True):
+            st.session_state.editing_word_target = False
+            st.rerun()
+else:
+    if st.button("✏️ Edit Word Target", key="edit_target_btn"):
+        st.session_state.editing_word_target = True
+        st.rerun()
+
+# Quick notes display if enabled
+if st.session_state.show_jots and st.session_state.quick_jots:
+    st.markdown("---")
+    st.subheader("📝 Quick Notes")
+    
+    for i, jot in enumerate(st.session_state.quick_jots):
+        with st.expander(f"Note {i+1}: {jot['text'][:50]}..."):
+            st.write(jot['text'])
+            if jot['year']:
+                st.caption(f"📅 Estimated year: {jot['year']}")
+            st.caption(f"🗓️ Saved: {jot['date'][:10]} • 📊 {jot['word_count']} words")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"Use as Prompt", key=f"use_jot_{i}"):
+                    st.session_state.current_question_override = jot['text']
+                    st.rerun()
+            with col2:
+                if st.button(f"Delete", key=f"delete_jot_{i}"):
+                    st.session_state.quick_jots.pop(i)
+                    st.rerun()
+    
+    if st.button("Close Quick Notes", key="close_jots"):
+        st.session_state.show_jots = False
+        st.rerun()
