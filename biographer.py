@@ -13,7 +13,10 @@ import secrets
 import string
 import time
 
-# Import ALL modules
+# ============================================================================
+# IMPORTS
+# ============================================================================
+
 try:
     from topic_bank import TopicBank
     from session_manager import SessionManager
@@ -27,6 +30,10 @@ except ImportError as e:
 
 DEFAULT_WORD_TARGET = 500
 
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
+
 client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY")))
 
 # Load external CSS
@@ -38,12 +45,15 @@ except FileNotFoundError:
 
 LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo.png"
 
+# ============================================================================
+# SESSIONS LOADING
+# ============================================================================
+
 def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
     """Load sessions ONLY from CSV file"""
     try:
         import pandas as pd
         
-        # Create sessions directory if it doesn't exist
         os.makedirs(os.path.dirname(csv_path) if os.path.dirname(csv_path) else '.', exist_ok=True)
         
         if not os.path.exists(csv_path):
@@ -61,7 +71,6 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
         
         df = pd.read_csv(csv_path)
         
-        # Check required columns
         required_columns = ['session_id', 'question']
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
@@ -69,28 +78,24 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
             st.info("CSV must have at least: session_id, question")
             return []
         
-        # Group by session_id
         sessions_dict = {}
         
         for session_id, group in df.groupby('session_id'):
             session_id_int = int(session_id)
             group = group.reset_index(drop=True)
             
-            # Get title
             title = f"Session {session_id_int}"
             if 'title' in group.columns and not group.empty:
                 first_title = group.iloc[0]['title']
                 if pd.notna(first_title) and str(first_title).strip():
                     title = str(first_title).strip()
             
-            # Get guidance
             guidance = ""
             if 'guidance' in group.columns and not group.empty:
                 first_guidance = group.iloc[0]['guidance']
                 if pd.notna(first_guidance) and str(first_guidance).strip():
                     guidance = str(first_guidance).strip()
             
-            # Get word target
             word_target = DEFAULT_WORD_TARGET
             if 'word_target' in group.columns and not group.empty:
                 first_target = group.iloc[0]['word_target']
@@ -100,7 +105,6 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
                     except:
                         word_target = DEFAULT_WORD_TARGET
             
-            # Get all questions
             questions = []
             for _, row in group.iterrows():
                 if 'question' in row and pd.notna(row['question']) and str(row['question']).strip():
@@ -131,6 +135,10 @@ def load_sessions_from_csv(csv_path="sessions/sessions.csv"):
 
 SESSIONS = load_sessions_from_csv()
 
+# ============================================================================
+# EMAIL CONFIG
+# ============================================================================
+
 EMAIL_CONFIG = {
     "smtp_server": st.secrets.get("SMTP_SERVER", "smtp.gmail.com"),
     "smtp_port": int(st.secrets.get("SMTP_PORT", 587)),
@@ -138,6 +146,10 @@ EMAIL_CONFIG = {
     "sender_password": st.secrets.get("SENDER_PASSWORD", ""),
     "use_tls": True
 }
+
+# ============================================================================
+# AUTHENTICATION FUNCTIONS
+# ============================================================================
 
 def generate_password(length=12):
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
@@ -262,7 +274,6 @@ def send_welcome_email(user_data, credentials):
         msg['To'] = user_data['email']
         msg['Subject'] = "Welcome to Tell My Story"
         
-        # Simplified email body
         body = f"""
         <html>
         <body style="font-family: Arial; line-height: 1.6;">
@@ -309,6 +320,10 @@ def logout_user():
     st.query_params.clear()
     st.rerun()
 
+# ============================================================================
+# STORAGE FUNCTIONS
+# ============================================================================
+
 def get_user_filename(user_id):
     filename_hash = hashlib.md5(user_id.encode()).hexdigest()[:8]
     return f"user_data_{filename_hash}.json"
@@ -341,6 +356,10 @@ def save_user_data(user_id, responses_data):
     except Exception as e:
         print(f"Error saving user data for {user_id}: {e}")
         return False
+
+# ============================================================================
+# CORE RESPONSE FUNCTIONS
+# ============================================================================
 
 def save_response(session_id, question, answer):
     user_id = st.session_state.user_id
@@ -467,6 +486,10 @@ def auto_correct_text(text):
         return response.choices[0].message.content
     except:
         return text
+
+# ============================================================================
+# MODULE INTEGRATION FUNCTIONS
+# ============================================================================
 
 def switch_to_vignette(vignette_topic, content=""):
     st.session_state.current_question_override = f"Vignette: {vignette_topic}"
@@ -735,6 +758,10 @@ def show_session_manager():
     
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ============================================================================
+# PAGE CONFIG & STATE INITIALIZATION
+# ============================================================================
+
 st.set_page_config(
     page_title="Tell My Story - Your Life Timeline",
     page_icon="📖",
@@ -805,6 +832,10 @@ if st.session_state.logged_in and st.session_state.user_id and not st.session_st
                 continue
     st.session_state.data_loaded = True
 
+# ============================================================================
+# SESSIONS CHECK
+# ============================================================================
+
 if not SESSIONS:
     st.error("❌ No sessions loaded. Please create a sessions/sessions.csv file.")
     st.info("""
@@ -818,6 +849,10 @@ if not SESSIONS:
     Save it as: sessions/sessions.csv
     """)
     st.stop()
+
+# ============================================================================
+# PROFILE SETUP MODAL
+# ============================================================================
 
 if st.session_state.get('show_profile_setup', False):
     st.markdown('<div class="profile-setup-modal">', unsafe_allow_html=True)
@@ -858,26 +893,39 @@ if st.session_state.get('show_profile_setup', False):
             submit_button = st.form_submit_button("Complete Profile", type="primary", use_container_width=True)
         with col2:
             skip_button = st.form_submit_button("Skip for Now", type="secondary", use_container_width=True)
-        if submit_button or skip_button:
-            if submit_button:
-                if not birth_month or not birth_day or not birth_year:
-                    st.error("Please complete your birthdate or click 'Skip for Now'")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    return
-            birthdate = f"{birth_month} {birth_day}, {birth_year}" if submit_button else ""
-            account_for_value = "self" if account_for == "For me" else "other"
+        
+        if submit_button:
+            if not birth_month or not birth_day or not birth_year:
+                st.error("Please complete your birthdate or click 'Skip for Now'")
+            else:
+                birthdate = f"{birth_month} {birth_day}, {birth_year}"
+                account_for_value = "self" if account_for == "For me" else "other"
+                if st.session_state.user_account:
+                    st.session_state.user_account['profile']['gender'] = gender
+                    st.session_state.user_account['profile']['birthdate'] = birthdate
+                    st.session_state.user_account['profile']['timeline_start'] = birthdate
+                    st.session_state.user_account['account_type'] = account_for_value
+                    save_account_data(st.session_state.user_account)
+                    st.success("Profile updated!")
+                st.session_state.show_profile_setup = False
+                st.rerun()
+        
+        if skip_button:
             if st.session_state.user_account:
-                st.session_state.user_account['profile']['gender'] = gender if submit_button else ""
-                st.session_state.user_account['profile']['birthdate'] = birthdate
-                st.session_state.user_account['profile']['timeline_start'] = birthdate
-                st.session_state.user_account['account_type'] = account_for_value
+                st.session_state.user_account['profile']['gender'] = ""
+                st.session_state.user_account['profile']['birthdate'] = ""
+                st.session_state.user_account['profile']['timeline_start'] = ""
+                st.session_state.user_account['account_type'] = "self"
                 save_account_data(st.session_state.user_account)
-                st.success("Profile updated!")
             st.session_state.show_profile_setup = False
-            st.markdown('</div>', unsafe_allow_html=True)
             st.rerun()
+    
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
+
+# ============================================================================
+# AUTHENTICATION COMPONENTS
+# ============================================================================
 
 if not st.session_state.logged_in:
     st.markdown("""
@@ -997,6 +1045,10 @@ if not st.session_state.logged_in:
                             st.error(f"Error: {result.get('error', 'Unknown error')}")
     st.stop()
 
+# ============================================================================
+# MODAL HANDLING (PRIORITY ORDER)
+# ============================================================================
+
 if st.session_state.show_vignette_detail:
     show_vignette_detail()
     st.stop()
@@ -1021,11 +1073,19 @@ if st.session_state.show_session_creator:
     show_session_creator()
     st.stop()
 
+# ============================================================================
+# MAIN HEADER
+# ============================================================================
+
 st.markdown(f"""
 <div class="main-header">
 <img src="{LOGO_URL}" class="logo-img" alt="Tell My Story Logo">
 </div>
 """, unsafe_allow_html=True)
+
+# ============================================================================
+# SIDEBAR
+# ============================================================================
 
 with st.sidebar:
     st.markdown("""
@@ -1221,6 +1281,10 @@ with st.sidebar:
         if st.button("🔥 Clear All", type="secondary", use_container_width=True, key="clear_all_btn"):
             st.session_state.confirming_clear = "all"
             st.rerun()
+
+# ============================================================================
+# MAIN CONTENT AREA
+# ============================================================================
 
 if st.session_state.current_session >= len(SESSIONS):
     st.session_state.current_session = 0
@@ -1424,6 +1488,10 @@ with col4:
         total_answers_all += len(session_data.get("questions", {}))
     st.metric("Total Answers", f"{total_answers_all}")
 
+# ============================================================================
+# FOOTER
+# ============================================================================
+
 st.markdown("---")
 if st.session_state.user_account:
     profile = st.session_state.user_account['profile']
@@ -1435,9 +1503,6 @@ Tell My Story Timeline • 👤 {profile['first_name']} {profile['last_name']} �
     st.caption(footer_info)
 else:
     st.caption(f"Tell My Story Timeline • User: {st.session_state.user_id}")
-
-
-
 
 
 
