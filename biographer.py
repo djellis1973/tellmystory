@@ -488,6 +488,164 @@ def auto_correct_text(text):
         return text
 
 # ============================================================================
+# BETA READER FUNCTIONS
+# ============================================================================
+
+def get_session_full_text(session_id):
+    """Get all responses from a session as continuous text for beta reading"""
+    if session_id not in st.session_state.responses:
+        return ""
+    
+    session_text = ""
+    session_data = st.session_state.responses[session_id]
+    
+    if "questions" in session_data:
+        for question, answer_data in session_data["questions"].items():
+            session_text += f"Q: {question}\nA: {answer_data['answer']}\n\n"
+    
+    return session_text
+
+def generate_beta_reader_feedback(session_title, session_text, feedback_type="comprehensive"):
+    """Generate beta reader/editor feedback for a completed session"""
+    if not session_text.strip():
+        return {"error": "Session has no content to analyze"}
+    
+    critique_templates = {
+        "comprehensive": """You are a professional editor and beta reader. Analyze this life story excerpt and provide:
+        1. **Overall Impression** (2-3 sentences)
+        2. **Strengths** (3-5 bullet points)
+        3. **Areas for Improvement** (3-5 bullet points with specific suggestions)
+        4. **Continuity Check** (Note any timeline inconsistencies)
+        5. **Emotional Resonance** (How engaging/emotional is it?)
+        6. **Specific Edits** (3-5 suggested rewrites with explanations)
+        
+        Format your response clearly with headings and bullet points.""",
+        
+        "concise": """You are an experienced beta reader. Provide brief, actionable feedback on:
+        - Main strengths
+        - 2-3 specific areas to improve
+        - 1-2 specific editing suggestions
+        
+        Keep it under 300 words.""",
+        
+        "developmental": """You are a developmental editor. Focus on:
+        - Narrative structure and flow
+        - Character/personality development
+        - Pacing and detail balance
+        - Theme consistency
+        - Suggested structural changes"""
+    }
+    
+    prompt = critique_templates.get(feedback_type, critique_templates["comprehensive"])
+    
+    full_prompt = f"""{prompt}
+
+    SESSION TITLE: {session_title}
+    
+    SESSION CONTENT:
+    {session_text}
+    
+    Please provide your analysis:"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a thoughtful, constructive editor who balances praise with helpful critique."},
+                {"role": "user", "content": full_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1500
+        )
+        
+        feedback = response.choices[0].message.content
+        
+        return {
+            "session_title": session_title,
+            "feedback": feedback,
+            "generated_at": datetime.now().isoformat(),
+            "feedback_type": feedback_type
+        }
+        
+    except Exception as e:
+        return {"error": f"Analysis failed: {str(e)}"}
+
+def save_beta_feedback(user_id, session_id, feedback_data):
+    """Save beta feedback to user's data file"""
+    try:
+        filename = get_user_filename(user_id)
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                user_data = json.load(f)
+        else:
+            user_data = {"responses": {}, "vignettes": [], "beta_feedback": {}}
+        
+        if "beta_feedback" not in user_data:
+            user_data["beta_feedback"] = {}
+        
+        user_data["beta_feedback"][str(session_id)] = feedback_data
+        
+        with open(filename, 'w') as f:
+            json.dump(user_data, f, indent=2)
+        
+        return True
+    except Exception as e:
+        print(f"Error saving beta feedback: {e}")
+        return False
+
+def get_previous_beta_feedback(user_id, session_id):
+    """Retrieve previous beta feedback for a session"""
+    try:
+        filename = get_user_filename(user_id)
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                user_data = json.load(f)
+            
+            if "beta_feedback" in user_data and str(session_id) in user_data["beta_feedback"]:
+                return user_data["beta_feedback"][str(session_id)]
+    except:
+        pass
+    return None
+
+def show_beta_reader_modal():
+    """Display the beta reader feedback modal"""
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    feedback = st.session_state.current_beta_feedback
+    
+    if st.button("← Back to Writing", key="beta_reader_back"):
+        st.session_state.show_beta_reader = False
+        st.rerun()
+    
+    st.title(f"🦋 Beta Reader: {feedback.get('session_title', 'Session')}")
+    st.caption(f"Generated: {datetime.fromisoformat(feedback['generated_at']).strftime('%B %d, %Y at %I:%M %p')}")
+    
+    st.divider()
+    
+    # Full feedback
+    st.subheader("📝 Editor's Analysis")
+    st.markdown(feedback["feedback"])
+    
+    # Action buttons
+    st.divider()
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Regenerate Feedback", use_container_width=True):
+            st.session_state.show_beta_reader = False
+            st.rerun()
+    
+    with col2:
+        if st.button("💾 Save to Profile", use_container_width=True, type="primary"):
+            if save_beta_feedback(st.session_state.user_id, current_session["id"], feedback):
+                st.success("Feedback saved!")
+                time.sleep(1)
+                st.session_state.show_beta_reader = False
+                st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ============================================================================
 # MODULE INTEGRATION FUNCTIONS
 # ============================================================================
 
@@ -800,6 +958,8 @@ default_state = {
     "editing_vignette_id": None,
     "selected_vignette_for_session": None,
     "published_vignette": None,
+    "show_beta_reader": False,  # NEW: Beta reader modal state
+    "current_beta_feedback": None,  # NEW: Store current feedback
 }
 
 for key, value in default_state.items():
@@ -1048,6 +1208,11 @@ if not st.session_state.logged_in:
 # ============================================================================
 # MODAL HANDLING (PRIORITY ORDER)
 # ============================================================================
+
+# NEW: Beta Reader Modal (added to priority order)
+if st.session_state.show_beta_reader and st.session_state.current_beta_feedback:
+    show_beta_reader_modal()
+    st.stop()
 
 if st.session_state.show_vignette_detail:
     show_vignette_detail()
@@ -1419,6 +1584,75 @@ with col3:
                 st.rerun()
 
 st.divider()
+
+# ============================================================================
+# BETA READER SECTION (NEW)
+# ============================================================================
+
+st.subheader("🦋 Beta Reader Feedback")
+
+# Check if session is complete
+session_data = st.session_state.responses.get(current_session_id, {})
+responses_count = len(session_data.get("questions", {}))
+total_questions = len(current_session["questions"])
+
+if responses_count == total_questions and total_questions > 0:
+    st.success("✅ Session complete - ready for beta reading!")
+    
+    # Check for previous feedback
+    previous_feedback = get_previous_beta_feedback(st.session_state.user_id, current_session_id)
+    
+    if previous_feedback:
+        st.info(f"📖 Previous feedback available from {datetime.fromisoformat(previous_feedback['generated_at']).strftime('%B %d')}")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        feedback_type = st.selectbox(
+            "Feedback Type",
+            ["comprehensive", "concise", "developmental"],
+            key="beta_reader_type",
+            help="Comprehensive: Detailed analysis | Concise: Quick feedback | Developmental: Structural focus"
+        )
+    
+    with col2:
+        if st.button("🦋 Get Beta Reader Feedback", use_container_width=True, type="primary"):
+            with st.spinner("Analyzing your session with professional editor eyes..."):
+                # Get all session text
+                session_text = get_session_full_text(current_session_id)
+                
+                if not session_text.strip():
+                    st.error("Session has no content to analyze")
+                else:
+                    # Generate feedback
+                    feedback = generate_beta_reader_feedback(
+                        current_session["title"], 
+                        session_text, 
+                        feedback_type
+                    )
+                    
+                    if "error" not in feedback:
+                        st.session_state.current_beta_feedback = feedback
+                        st.session_state.show_beta_reader = True
+                        st.rerun()
+                    else:
+                        st.error(f"Failed to generate feedback: {feedback['error']}")
+    
+    # Show previous feedback button
+    if previous_feedback:
+        if st.button("📖 View Previous Feedback", use_container_width=True):
+            st.session_state.current_beta_feedback = previous_feedback
+            st.session_state.show_beta_reader = True
+            st.rerun()
+else:
+    st.info(f"Complete all {total_questions} topics in this session to get beta reader feedback.")
+
+st.divider()
+
+# ============================================================================
+# SESSION PROGRESS (Original continues here)
+# ============================================================================
+
 progress_info = get_progress_info(current_session_id)
 st.markdown(f"""
 <div class="progress-container">
