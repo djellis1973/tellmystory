@@ -6,7 +6,7 @@ from openai import OpenAI
 import os
 import re
 import hashlib
-import smtplib
+import smtplibF
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import secrets
@@ -549,7 +549,7 @@ def generate_beta_reader_feedback(session_title, session_text, feedback_type="co
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a thoughtful, constructive editor who balances praise with helpful critique."},
                 {"role": "user", "content": full_prompt}
