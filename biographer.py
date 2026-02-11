@@ -6,7 +6,7 @@ from openai import OpenAI
 import os
 import re
 import hashlib
-import smtplibF
+import smtplib  # Fixed this line - removed the 'F'
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import secrets
