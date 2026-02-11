@@ -221,5 +221,30 @@ section[data-testid="stSidebar"] .stButton > button {
     border-radius: 8px;
     border: 2px solid #b5f5ec;
 }
+/* Beta Reader Specific Styles */
+.beta-reader-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
 
+.feedback-point {
+    background: rgba(255, 255, 255, 0.1);
+    border-left: 4px solid #ffd700;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 0 5px 5px 0;
+}
+
+.editor-note {
+    background: #fff8e1;
+    border-left: 4px solid #ffb300;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+    border-radius: 0 5px 5px 0;
+}
 
