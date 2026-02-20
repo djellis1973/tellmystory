@@ -555,7 +555,7 @@ def show_privacy_settings():
     st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
     st.title("🔒 Privacy & Security Settings")
     
-    if st.button("← Back", key="privacy_back"):
+    if st.button("← Back", key="privacy_back_btn"):  # ADD UNIQUE KEY
         st.session_state.show_privacy_settings = False
         st.rerun()
     
