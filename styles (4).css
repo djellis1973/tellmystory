@@ -1,0 +1,437 @@
+/* styles.css - Complete version for Tell My Story */
+.main-header {
+    text-align: center;
+    padding-top: 0.5rem;
+    margin-top: -1rem;
+    margin-bottom: 0.5rem;
+}
+
+.logo-img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin: 0 auto 0.25rem auto;
+    display: block;
+}
+
+[data-testid="stAppViewContainer"] {
+    padding-top: 0.5rem !important;
+    background: linear-gradient(135deg, #f0f8ff 0%, #f0fff4 100%) !important;
+}
+
+.chapter-guidance {
+    background-color: #e6f7ff;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid #1890ff;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #0066cc;
+}
+
+.question-box {
+    background: linear-gradient(135deg, #e6f7ff 0%, #e6fffb 100%);
+    padding: 1.5rem;
+    border-radius: 10px;
+    border-left: 5px solid #13c2c2;
+    margin-bottom: 0.5rem;
+    font-size: 1.3rem;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(19, 194, 194, 0.2);
+    line-height: 1.4;
+    color: #006666;
+}
+
+.question-counter, .topic-counter {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #0066cc;
+    margin-top: 1rem;
+}
+
+.custom-topic-badge {
+    margin-top: 1rem;
+    color: #9b59b6;
+}
+
+.progress-container {
+    background: linear-gradient(135deg, #e6f7ff 0%, #e6fffb 100%);
+    padding: 1.5rem;
+    border-radius: 10px;
+    border: 2px solid #b5f5ec;
+    margin: 1rem 0;
+}
+
+.progress-header {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    color: #0066cc;
+}
+
+.progress-status {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #006d75;
+}
+
+.progress-bar-container {
+    height: 10px;
+    background-color: #e6fffb;
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 1rem 0;
+    border: 1px solid #b5f5ec;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.3s ease;
+}
+
+.progress-stats {
+    text-align: center;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.edit-target-box {
+    background-color: #e6f7ff;
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 0.5rem 0;
+    border: 1px solid #91d5ff;
+}
+
+.warning-box {
+    background-color: #fff7e6;
+    border: 1px solid #ffd591;
+    border-radius: 6px;
+    padding: 1rem;
+    margin: 0.5rem 0;
+    color: #d46b08;
+}
+
+.modal-overlay {
+    background: linear-gradient(135deg, #e6f7ff 0%, #e6fffb 100%);
+    padding: 2rem;
+    border-radius: 15px;
+    margin: 1rem;
+    border: 2px solid #b5f5ec;
+}
+
+.auth-container {
+    max-width: 500px;
+    margin: 3rem auto;
+    padding: 2.5rem;
+    background: linear-gradient(135deg, #e6f7ff 0%, #e6fffb 100%);
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(24, 144, 255, 0.1);
+    border: 2px solid #b5f5ec;
+}
+
+.auth-container h1 {
+    text-align: center;
+    color: #0066cc;
+    margin-bottom: 0.5rem;
+    font-size: 2rem;
+    font-weight: 300;
+}
+
+.auth-container p {
+    text-align: center;
+    color: #36cfc9;
+    margin-bottom: 2rem;
+    font-size: 1rem;
+}
+
+.forgot-password {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+.forgot-password a {
+    color: #1890ff;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.forgot-password a:hover {
+    text-decoration: underline;
+}
+
+.profile-setup-modal {
+    background: linear-gradient(135deg, #e6f7ff 0%, #e6fffb 100%);
+    border-radius: 15px;
+    padding: 2rem;
+    margin: 2rem auto;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(24, 144, 255, 0.1);
+    border: 2px solid #b5f5ec;
+}
+
+/* Button styles */
+.stSidebar .stButton button,
+section[data-testid="stSidebar"] .stButton > button {
+    width: 100% !important;
+    margin-bottom: 0.5rem !important;
+    display: block !important;
+}
+
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #1890ff 0%, #36cfc9 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.75rem !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.stButton > button[kind="secondary"] {
+    background: linear-gradient(135deg, #e6f7ff 0%, #e6fffb 100%) !important;
+    color: #0066cc !important;
+    border: 2px solid #bae7ff !important;
+    border-radius: 8px !important;
+    padding: 0.75rem !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Form elements */
+.stTextArea textarea {
+    border: 2px solid #b5f5ec !important;
+    border-radius: 8px !important;
+    padding: 1rem !important;
+}
+
+.stTextArea textarea:focus {
+    border-color: #1890ff !important;
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1) !important;
+}
+
+.stMetric {
+    background: linear-gradient(135deg, #e6f7ff 0%, #e6fffb 100%);
+    border-radius: 10px;
+    padding: 1rem;
+    border: 2px solid #b5f5ec;
+}
+
+.stDivider {
+    border-color: #b5f5ec !important;
+}
+
+.stRadio div[role="radiogroup"] {
+    background-color: #e6fffb;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 2px solid #b5f5ec;
+}
+
+/* Beta Reader Specific Styles */
+.beta-reader-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.feedback-point {
+    background: rgba(255, 255, 255, 0.1);
+    border-left: 4px solid #ffd700;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 0 5px 5px 0;
+}
+
+.editor-note {
+    background: #fff8e1;
+    border-left: 4px solid #ffb300;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+    border-radius: 0 5px 5px 0;
+}
+
+/* Stronger button pressed/active state */
+.stButton button:active {
+    transform: translateY(2px) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
+    filter: brightness(0.95) !important;
+    border-color: #0066cc !important;
+}
+
+/* For primary buttons - even more visible pressed state */
+.stButton button[kind="primary"]:active {
+    transform: translateY(2px) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3) inset !important;
+    background-color: #0052a3 !important;
+    border-color: #004080 !important;
+}
+
+/* Optional: Add transition for smooth effect */
+.stButton button {
+    transition: all 0.05s ease-in-out !important;
+}
+
+/* New styles added from inline CSS */
+.sidebar-header {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.sidebar-header h2 {
+    color: #0066cc;
+}
+
+.sidebar-header p {
+    color: #36cfc9;
+}
+
+.narrative-gps-box {
+    background-color: #e6f3ff;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #0066cc;
+}
+
+.narrative-gps-box p {
+    color: #004d99;
+}
+
+.welcome-email {
+    background: #f0f8ff;
+    padding: 15px;
+    border-left: 4px solid #3498db;
+}
+
+.story-image {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 5px 0;
+}
+
+.image-drop-info {
+    background-color: #f0f8ff;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    border-left: 4px solid #36cfc9;
+}
+
+.cover-preview {
+    width: 300px;
+    height: 400px;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    margin-top: 20px;
+}
+
+.cover-preview p {
+    margin-top: 50px;
+}
+
+/* HTML export styles - kept for reference but not used in Streamlit */
+@media print {
+    body {
+        font-family: 'Georgia', 'Times New Roman', serif;
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+        line-height: 1.6;
+        color: #333;
+        background: #fff;
+    }
+    h1 {
+        color: #667eea;
+        text-align: center;
+        font-size: 2.5em;
+        border-bottom: 3px solid #667eea;
+        padding-bottom: 10px;
+    }
+    h2 {
+        color: #764ba2;
+        margin-top: 40px;
+    }
+    .author {
+        text-align: center;
+        font-size: 1.2em;
+        color: #666;
+        margin-bottom: 40px;
+    }
+    .story {
+        margin-bottom: 50px;
+        padding: 25px;
+        background: #f9f9f9;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .question {
+        font-size: 1.4em;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        border-left: 4px solid #667eea;
+        padding-left: 15px;
+    }
+    .answer {
+        font-size: 1.1em;
+        white-space: pre-wrap;
+        margin-bottom: 20px;
+    }
+    img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin: 15px 0;
+        display: block;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .caption {
+        font-style: italic;
+        color: #666;
+        text-align: center;
+        margin-top: -10px;
+        margin-bottom: 20px;
+        font-size: 0.95em;
+    }
+    hr {
+        border: none;
+        border-top: 2px solid #e0e0e0;
+        margin: 40px 0;
+    }
+    .footer {
+        text-align: center;
+        color: #999;
+        font-size: 0.9em;
+        margin-top: 50px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+    }
+    .image-gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: center;
+        margin: 20px 0;
+    }
+    .image-item {
+        flex: 0 1 auto;
+        max-width: 300px;
+    }
+}
