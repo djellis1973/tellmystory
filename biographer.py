@@ -79,7 +79,6 @@ DEFAULT_WORD_TARGET = 500
 client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY")))
 beta_reader = BetaReader(client) if BetaReader else None
 
-# Initialize session state
 default_state = {
     "qb_manager": None, "qb_manager_initialized": False, "user_id": None, "logged_in": False,
     "current_session": 0, "current_question": 0, "responses": {}, "editing": False,
@@ -99,9 +98,10 @@ default_state = {
     "current_rewrite_data": None, "show_ai_rewrite": False, "show_ai_rewrite_menu": False,
     "editor_content": {}, "show_privacy_settings": False, "show_cover_designer": False,
     "beta_feedback_display": None, "beta_feedback_storage": {},
-    "auth_tab": 'login',  # Added for authentication
-    "show_publisher": False,  # <-- ADD THIS LINE
-    "cover_image_data": None  # <-- ADD THIS LINE
+    "auth_tab": 'login',
+    "show_publisher": False,
+    "cover_image_data": None,  # <-- COMMA ADDED HERE
+    "show_support": False  # <-- ADD THIS LINE (no comma needed at the end)
 }
 for key, value in default_state.items():
     if key not in st.session_state:
