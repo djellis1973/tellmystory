@@ -3063,9 +3063,56 @@ if st.session_state.show_session_creator:
         st.stop()
 
 # ============================================================================
-# MAIN HEADER
+# MAIN HEADER WITH PROMINENT SUPPORT BUTTON
 # ============================================================================
-st.markdown(f'<div class="main-header"><img src="{LOGO_URL}" class="logo-img"></div>', unsafe_allow_html=True)
+col_logo, col_title, col_support = st.columns([1, 3, 1])
+with col_logo:
+    st.markdown(f'<img src="{LOGO_URL}" class="logo-img" style="max-width:100px;">', unsafe_allow_html=True)
+with col_title:
+    st.markdown('<h1 style="margin-top:20px;">Tell My Story</h1>', unsafe_allow_html=True)
+with col_support:
+    st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
+    if st.button("❓ Help", type="primary", use_container_width=True):
+        st.session_state.show_support = not st.session_state.get('show_support', False)
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ============================================================================
+# SUPPORT SECTION - Show when help button clicked
+# ============================================================================
+if st.session_state.get('show_support', False):
+    # Hide the sidebar when in support mode
+    st.markdown("""
+    <style>
+        section[data-testid="stSidebar"] { display: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Add Back button at the top (above tabs)
+    col_back1, col_back2, col_back3 = st.columns([1, 2, 1])
+    with col_back2:
+        if st.button("← Back to Writing", type="primary", use_container_width=True):
+            st.session_state.show_support = False
+            st.rerun()
+    
+    try:
+        from support_section import SupportSection
+        support = SupportSection()
+        support.render()
+        st.stop()
+        
+    except ImportError:
+        st.error("Support section not available. Please ensure support_section.py is in the same directory.")
+        if st.button("← Back"):
+            st.session_state.show_support = False
+            st.rerun()
+        st.stop()
+    except Exception as e:
+        st.error(f"Error loading support section: {e}")
+        if st.button("← Back"):
+            st.session_state.show_support = False
+            st.rerun()
+        st.stop()
 
 # ============================================================================
 # SIDEBAR
