@@ -1,4 +1,5 @@
 /* styles.css - Complete version for Tell My Story */
+
 .main-header {
     text-align: center;
     padding-top: 0.5rem;
@@ -434,4 +435,47 @@ section[data-testid="stSidebar"] .stButton > button {
         flex: 0 1 auto;
         max-width: 300px;
     }
+}
+
+/* ========== VERY DARK BLUE BACK BUTTONS ========== */
+/* Force all back/return buttons to be extremely dark */
+button:has(span:contains("←")),
+button:has(span:contains("Back")),
+button:has(span:contains("Return")),
+.stButton > button[kind="secondary"],
+button[key*="back"],
+button[key*="Back"],
+div[data-testid="stButton"] button:has(svg) {
+    background-color: #0A1A4A !important;  /* Super dark navy */
+    color: white !important;
+    border: 2px solid white !important;  /* Add white border for contrast */
+    font-weight: bold !important;
+    font-size: 16px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+}
+
+/* Even darker on hover */
+button:has(span:contains("←")):hover,
+button:has(span:contains("Back")):hover,
+button:has(span:contains("Return")):hover,
+.stButton > button[kind="secondary"]:hover,
+button[key*="back"]:hover,
+button[key*="Back"]:hover {
+    background-color: #030617 !important;  /* Almost black */
+    color: white !important;
+    border: 2px solid #FFD700 !important;  /* Gold border on hover */
+}
+
+/* Close buttons in modals - bright red */
+.modal-overlay button:has(span:contains("✕")),
+.modal-overlay button:has(span:contains("×")) {
+    background-color: #B22222 !important;  /* Fire brick red */
+    color: white !important;
+    font-weight: bold !important;
+    border: 2px solid white !important;
+}
+
+.modal-overlay button:has(span:contains("✕")):hover,
+.modal-overlay button:has(span:contains("×")):hover {
+    background-color: #8B0000 !important;  /* Dark red */
 }
