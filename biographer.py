@@ -1,4 +1,4 @@
-# biographer.py – Tell My Story App (PRODUCTION READY)
+# biographer.py – Tell My Story App (PRODUCTION READY with Session Persistence)
 import streamlit as st
 import json
 from datetime import datetime, date, timedelta
@@ -24,6 +24,7 @@ import csv
 import uuid
 import logging
 from pathlib import Path
+import pickle  # Added for session persistence
 
 # ============================================================================
 # PRODUCTION CONFIGURATION - MUST BE FIRST
@@ -49,6 +50,137 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================================
+# PERSISTENT SESSION MANAGEMENT - ADDED FOR PRODUCTION
+# ============================================================================
+SESSION_DIR = "persistent_sessions"
+AUTO_BACKUP_DIR = "auto_backups"
+
+def save_session_to_disk(user_id):
+    """Save user session to disk for persistence across server restarts"""
+    if not user_id:
+        return False
+    
+    try:
+        session_data = {
+            "user_id": user_id,
+            "user_account": st.session_state.get('user_account'),
+            "logged_in": True,
+            "timestamp": datetime.now().isoformat(),
+            "app_version": st.session_state.get("app_version", "2.0.0")
+        }
+        session_file = Path(SESSION_DIR) / f"{user_id}.session"
+        with open(session_file, 'w') as f:
+            json.dump(session_data, f, indent=2)
+        logger.info(f"Session saved to disk for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving session to disk: {e}")
+        return False
+
+def load_session_from_disk(user_id):
+    """Load user session from disk"""
+    try:
+        session_file = Path(SESSION_DIR) / f"{user_id}.session"
+        if session_file.exists():
+            with open(session_file, 'r') as f:
+                session_data = json.load(f)
+            return session_data
+    except Exception as e:
+        logger.error(f"Error loading session from disk: {e}")
+    return None
+
+def clear_session_from_disk(user_id):
+    """Remove session file on logout"""
+    try:
+        session_file = Path(SESSION_DIR) / f"{user_id}.session"
+        if session_file.exists():
+            session_file.unlink()
+            logger.info(f"Session file removed for user {user_id}")
+    except Exception as e:
+        logger.error(f"Error clearing session from disk: {e}")
+
+def recover_persistent_session():
+    """Try to recover a previously saved session"""
+    try:
+        session_files = list(Path(SESSION_DIR).glob("*.session"))
+        
+        if session_files:
+            # Get the most recent session
+            latest_session = max(session_files, key=lambda p: p.stat().st_mtime)
+            
+            with open(latest_session, 'r') as f:
+                session_data = json.load(f)
+            
+            # Check if session is recent (less than 30 days old)
+            session_time = datetime.fromisoformat(session_data['timestamp'])
+            if (datetime.now() - session_time).days < 30:
+                user_id = session_data['user_id']
+                
+                # Load the full account data
+                account = get_account_data(user_id=user_id)
+                if account:
+                    # Restore session state
+                    st.session_state.user_id = user_id
+                    st.session_state.user_account = account
+                    st.session_state.logged_in = True
+                    st.session_state.data_loaded = False
+                    
+                    # Initialize other session variables
+                    st.session_state.qb_manager = None
+                    st.session_state.qb_manager_initialized = False
+                    
+                    # Update last login
+                    account['last_login'] = datetime.now().isoformat()
+                    save_account_data(account)
+                    
+                    # Update session timestamp
+                    save_session_to_disk(user_id)
+                    
+                    logger.info(f"Session recovered for user {user_id}")
+                    return True
+    except Exception as e:
+        logger.error(f"Error recovering persistent session: {e}")
+    
+    return False
+
+def auto_backup_user_data():
+    """Create automatic backup of user data"""
+    if not st.session_state.get('user_id'):
+        return
+    
+    try:
+        backup_dir = Path(AUTO_BACKUP_DIR)
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_data = {
+            "user_id": st.session_state.user_id,
+            "user_account": st.session_state.user_account,
+            "responses": st.session_state.responses,
+            "backup_date": datetime.now().isoformat(),
+            "version": st.session_state.get("app_version", "2.0.0")
+        }
+        
+        backup_file = backup_dir / f"{st.session_state.user_id}_{timestamp}.json"
+        with open(backup_file, 'w') as f:
+            json.dump(backup_data, f, indent=2)
+        
+        # Keep only last 10 backups per user
+        user_backups = sorted([
+            f for f in backup_dir.glob(f"{st.session_state.user_id}_*.json")
+        ])
+        
+        while len(user_backups) > 10:
+            oldest = user_backups.pop(0)
+            oldest.unlink()
+            logger.info(f"Removed old backup: {oldest}")
+            
+        logger.info(f"Auto-backup created: {backup_file}")
+            
+    except Exception as e:
+        logger.error(f"Auto-backup failed: {e}")
+
+# ============================================================================
 # ENVIRONMENT VALIDATION
 # ============================================================================
 def validate_environment():
@@ -64,7 +196,9 @@ def validate_environment():
         "accounts", 
         "sessions", 
         "backups",
-        "logs"
+        "logs",
+        SESSION_DIR,  # Add persistent sessions directory
+        AUTO_BACKUP_DIR  # Add auto-backup directory
     ]
     
     for dir_path in required_dirs:
@@ -224,6 +358,14 @@ EMAIL_CONFIG = {
     "sender_password": st.secrets.get("SENDER_PASSWORD", ""),
     "use_tls": True
 }
+
+# ============================================================================
+# ATTEMPT SESSION RECOVERY ON STARTUP - ADDED
+# ============================================================================
+if not st.session_state.get('logged_in', False):
+    if recover_persistent_session():
+        logger.info("Session recovered automatically")
+        st.rerun()
 
 # ============================================================================
 # GAMIFICATION SYSTEM - STREAKS & MILESTONES
@@ -1214,6 +1356,11 @@ def send_welcome_email(user_data, credentials):
 
 def logout_user():
     logger.info(f"User logged out: {st.session_state.get('user_id')}")
+    
+    # Clear session from disk
+    if st.session_state.get('user_id'):
+        clear_session_from_disk(st.session_state.user_id)
+    
     st.session_state.qb_manager = None
     st.session_state.qb_manager_initialized = False
     st.session_state.image_handler = None
@@ -2436,6 +2583,10 @@ def save_user_data(user_id, responses_data):
         }
         with open(fname, 'w') as f: 
             json.dump(data, f, indent=2)
+        
+        # Create auto-backup after successful save
+        auto_backup_user_data()
+        
         return True
     except Exception as e:
         logger.error(f"Error saving user data: {e}")
@@ -3623,6 +3774,7 @@ if not st.session_state.logged_in:
             st.subheader("Welcome Back")
             email = st.text_input("Email Address", key="login_email_input")
             password = st.text_input("Password", type="password", key="login_password_input")
+            remember_me = st.checkbox("Remember me (stay logged in across browser sessions)", value=True, key="login_remember_me")
             
             if st.form_submit_button("Login", type="primary", use_container_width=True):
                 if email and password:
@@ -3636,6 +3788,11 @@ if not st.session_state.logged_in:
                             qb_manager=None, 
                             qb_manager_initialized=False
                         )
+                        
+                        # Save session to disk if "Remember Me" is checked
+                        if remember_me:
+                            save_session_to_disk(result["user_id"])
+                        
                         st.success("Login successful!"); 
                         st.rerun()
                     else: 
@@ -3685,6 +3842,10 @@ if not st.session_state.logged_in:
                             qb_manager=None, 
                             qb_manager_initialized=False
                         )
+                        
+                        # Auto-save session for new users
+                        save_session_to_disk(result["user_id"])
+                        
                         st.success("Account created!"); 
                         st.balloons(); 
                         st.rerun()
