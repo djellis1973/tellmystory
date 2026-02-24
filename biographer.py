@@ -215,6 +215,20 @@ def validate_environment():
 validate_environment()
 
 # ============================================================================
+# ADD RECORDING FUNCTION HERE (LINE 575)
+# ============================================================================
+def add_simple_recording_button():
+    """Simple one-time recording button"""
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎥 Record Demo")
+    
+    if st.sidebar.button("🔴 Start Recording"):
+        st.sidebar.info("Recording... Press R to stop")
+        st.components.v1.html("""
+        <script>window.parent.postMessage({type:"streamlit:start_recording"},"*");</script>
+        """, height=0)
+        
+# ============================================================================
 # IMPORTS WITH ERROR HANDLING
 # ============================================================================
 PUBLISHER_AVAILABLE = True
@@ -4214,6 +4228,9 @@ with st.sidebar:
     if st.session_state.user_account:
         profile = st.session_state.user_account['profile']
         st.success(f"✓ **{profile['first_name']} {profile['last_name']}**")
+        
+    # ADD THIS LINE RIGHT HERE (LINE 1876)
+    add_simple_recording_button()
     
     if st.button("📝 Complete Profile", key="complete_profile_btn", use_container_width=True): 
         st.session_state.show_profile_setup = True
