@@ -5246,7 +5246,20 @@ if st.session_state.get('show_publisher', False):
 # ============================================================================
 # MAIN CONTENT AREA
 # ============================================================================
-
+st.write("Debug - Modal states:", {
+    "show_vignette_modal": st.session_state.show_vignette_modal,
+    "show_vignette_manager": st.session_state.show_vignette_manager,
+    "show_vignette_detail": st.session_state.show_vignette_detail,
+    "show_topic_browser": st.session_state.show_topic_browser,
+    "show_session_manager": st.session_state.show_session_manager,
+    "show_session_creator": st.session_state.show_session_creator,
+    "show_bank_manager": st.session_state.show_bank_manager,
+    "show_bank_editor": st.session_state.show_bank_editor,
+    "show_privacy_settings": st.session_state.show_privacy_settings,
+    "show_cover_designer": st.session_state.show_cover_designer,
+    "show_profile_setup": st.session_state.show_profile_setup,
+    "show_ai_rewrite": st.session_state.show_ai_rewrite
+})
 if (st.session_state.show_vignette_modal or 
     st.session_state.show_vignette_manager or 
     st.session_state.show_vignette_detail or
