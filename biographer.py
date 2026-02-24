@@ -5092,7 +5092,7 @@ if st.session_state.get('show_publisher', False):
         """, unsafe_allow_html=True)
     
     stories_for_export = []
-        vignettes_for_export = []
+            vignettes_for_export = []
         st.write("--- VIGNETTE DEBUG INFO ---")
         try:
             from vignettes import VignetteManager
@@ -5128,6 +5128,7 @@ if st.session_state.get('show_publisher', False):
             st.error(traceback.format_exc())
             vignettes_for_export = []
         st.write("--- END VIGNETTE DEBUG ---")
+        # ===== END VIGNETTE LOADING =====    
         # ===== END OF NEW BLOCK =====
         
         if stories_for_export:
