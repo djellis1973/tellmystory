@@ -5092,7 +5092,7 @@ if st.session_state.get('show_publisher', False):
         """, unsafe_allow_html=True)
     
     stories_for_export = []
-            vignettes_for_export = []
+    vignettes_for_export = []
         st.write("--- VIGNETTE DEBUG INFO ---")
         try:
             from vignettes import VignetteManager
