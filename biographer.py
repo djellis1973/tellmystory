@@ -218,11 +218,12 @@ validate_environment()
 # ADD THE RECORDING FUNCTION HERE (AFTER LINE 574)
 # ============================================================================
 def add_recording_button():
-    """Add a demo recording button"""
+    """Add a demo recording button with unique key"""
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎥 Demo Recording")
     
-    if st.sidebar.button("🎬 Start Recording", type="primary", use_container_width=True):
+    # Use a completely unique key for this button
+    if st.sidebar.button("🎬 Start Recording", key="demo_recording_button_2026_02_24", type="primary", use_container_width=True):
         st.sidebar.info("""
         **Recording started!**
         
@@ -236,7 +237,7 @@ def add_recording_button():
             type: "streamlit:start_recording"
         }, "*");
         </script>
-        """)
+        """, height=0)
 # ============================================================================
 # IMPORTS WITH ERROR HANDLING
 # ============================================================================
