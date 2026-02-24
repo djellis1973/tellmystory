@@ -3751,10 +3751,10 @@ if not SESSIONS:
         st.rerun()
     st.stop()
 # ============================================================================
-# SIMPLE ADMIN USER MANAGEMENT
+# ENHANCED ADMIN USER MANAGEMENT
 # ============================================================================
 def show_admin_panel():
-    """Simple admin panel to view and delete users"""
+    """Enhanced admin panel to view user details and delete users"""
     st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
     
     col1, col2 = st.columns([6, 1])
@@ -3765,7 +3765,7 @@ def show_admin_panel():
             st.session_state.show_admin = False
             st.rerun()
     
-    # Get all users
+    # Get all users with detailed info
     users = []
     index_file = Path("accounts/accounts_index.json")
     
@@ -3774,62 +3774,223 @@ def show_admin_panel():
             index_data = json.load(f)
             
         for user_id, user_info in index_data.items():
-            users.append({
-                "id": user_id,
-                "email": user_info.get('email', ''),
-                "name": f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip(),
-                "created": user_info.get('created_at', '')[:10] if user_info.get('created_at') else 'Unknown'
-            })
+            # Load full account data for additional info
+            account = get_account_data(user_id=user_id)
+            
+            if account:
+                # Calculate account age
+                created = datetime.fromisoformat(account.get('created_at', datetime.now().isoformat()))
+                age_days = (datetime.now() - created).days
+                
+                # Get last login
+                last_login = account.get('last_login', 'Never')
+                if last_login != 'Never':
+                    last_login_dt = datetime.fromisoformat(last_login)
+                    last_login_str = last_login_dt.strftime('%Y-%m-%d %H:%M')
+                    days_since_login = (datetime.now() - last_login_dt).days
+                else:
+                    last_login_str = 'Never'
+                    days_since_login = 'N/A'
+                
+                # Get stats
+                stats = account.get('stats', {})
+                total_words = stats.get('total_words', 0)
+                total_sessions = stats.get('total_sessions', 0)
+                
+                # Get streak
+                streak_data = account.get('streak_data', {})
+                current_streak = streak_data.get('current_streak', 0)
+                
+                # Get milestones
+                milestones = streak_data.get('milestones', {})
+                milestones_achieved = sum(1 for v in milestones.values() if v)
+                
+                # Check if user has written anything
+                user_data_file = Path(get_user_filename(user_id))
+                has_data = user_data_file.exists()
+                
+                # Count actual responses
+                response_count = 0
+                if has_data:
+                    try:
+                        with open(user_data_file, 'r') as f:
+                            user_data = json.load(f)
+                            for session_data in user_data.get('responses', {}).values():
+                                response_count += len(session_data.get('questions', {}))
+                    except:
+                        pass
+                
+                users.append({
+                    "id": user_id,
+                    "email": account.get('email', ''),
+                    "name": f"{account.get('profile', {}).get('first_name', '')} {account.get('profile', {}).get('last_name', '')}".strip(),
+                    "created": created.strftime('%Y-%m-%d'),
+                    "age_days": age_days,
+                    "last_login": last_login_str,
+                    "days_since_login": days_since_login,
+                    "total_words": total_words,
+                    "total_sessions": total_sessions,
+                    "response_count": response_count,
+                    "current_streak": current_streak,
+                    "milestones": milestones_achieved,
+                    "account_type": account.get('account_type', 'self')
+                })
     
+    # Sort options
+    st.sidebar.markdown("### Sort Users")
+    sort_by = st.sidebar.selectbox(
+        "Sort by",
+        ["Created (newest)", "Created (oldest)", "Last Login", "Most Words", "Most Active", "Name"],
+        key="admin_sort"
+    )
+    
+    if sort_by == "Created (newest)":
+        users.sort(key=lambda x: x['created'], reverse=True)
+    elif sort_by == "Created (oldest)":
+        users.sort(key=lambda x: x['created'])
+    elif sort_by == "Last Login":
+        users.sort(key=lambda x: str(x['days_since_login']))
+    elif sort_by == "Most Words":
+        users.sort(key=lambda x: x['total_words'], reverse=True)
+    elif sort_by == "Most Active":
+        users.sort(key=lambda x: x['response_count'], reverse=True)
+    elif sort_by == "Name":
+        users.sort(key=lambda x: x['name'].lower())
+    
+    # Summary stats
     st.write(f"**Total Users:** {len(users)}")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        active_last_7 = sum(1 for u in users if u['days_since_login'] != 'N/A' and u['days_since_login'] <= 7)
+        st.metric("Active (7 days)", active_last_7)
+    with col2:
+        total_words_all = sum(u['total_words'] for u in users)
+        st.metric("Total Words", f"{total_words_all:,}")
+    with col3:
+        avg_words = total_words_all // len(users) if users else 0
+        st.metric("Avg Words/User", f"{avg_words:,}")
+    with col4:
+        users_with_content = sum(1 for u in users if u['response_count'] > 0)
+        st.metric("Users w/ Content", users_with_content)
+    
     st.divider()
     
     if not users:
         st.info("No users found")
     else:
-        for user in users:
-            col1, col2, col3, col4 = st.columns([2, 2.5, 2, 1])
-            with col1:
-                st.write(f"**{user['name'] or 'No name'}**")
-            with col2:
-                st.write(user['email'])
-            with col3:
-                st.write(f"Joined: {user['created']}")
-            with col4:
-                if st.button(f"🗑️", key=f"del_{user['id']}"):
-                    try:
-                        # Delete account file
-                        acc_file = Path(f"accounts/{user['id']}_account.json")
-                        if acc_file.exists():
-                            acc_file.unlink()
-                        
-                        # Remove from index
-                        if user['id'] in index_data:
-                            del index_data[user['id']]
-                            with open(index_file, 'w') as f:
-                                json.dump(index_data, f, indent=2)
-                        
-                        # Delete user data file
-                        data_file = Path(get_user_filename(user['id']))
-                        if data_file.exists():
-                            data_file.unlink()
-                        
-                        # Delete session file
-                        session_file = Path(SESSION_DIR) / f"{user['id']}.session"
-                        if session_file.exists():
-                            session_file.unlink()
-                        
-                        st.success(f"✅ Deleted {user['email']}")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+        # Create tabs for different views
+        tab1, tab2, tab3 = st.tabs(["📋 User List", "📊 Analytics", "🗑️ Delete Users"])
+        
+        with tab1:
+            # Display users in a table
+            for user in users:
+                with st.expander(f"📧 {user['email']} - {user['name'] or 'No name'}", expanded=False):
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown(f"**User ID:** `{user['id'][:8]}...`")
+                        st.markdown(f"**Joined:** {user['created']} ({user['age_days']} days)")
+                        st.markdown(f"**Last Login:** {user['last_login']}")
+                        if user['days_since_login'] != 'N/A':
+                            if user['days_since_login'] > 30:
+                                st.markdown(f"⚠️ Inactive: {user['days_since_login']} days")
+                    
+                    with col2:
+                        st.markdown(f"**Total Words:** {user['total_words']:,}")
+                        st.markdown(f"**Responses:** {user['response_count']}")
+                        st.markdown(f"**Sessions:** {user['total_sessions']}")
+                    
+                    with col3:
+                        st.markdown(f"**Current Streak:** {user['current_streak']} days 🔥")
+                        st.markdown(f"**Milestones:** {user['milestones']}/4")
+                        st.markdown(f"**Type:** {user['account_type']}")
+        
+        with tab2:
+            st.markdown("### 📊 User Analytics")
+            
+            # Activity chart
+            import pandas as pd
+            import plotly.express as px
+            
+            # Create dataframe for plotting
+            df = pd.DataFrame(users)
+            
+            # Words per user bar chart
+            if not df.empty:
+                fig1 = px.bar(df, x='email', y='total_words', 
+                             title='Words Written per User',
+                             labels={'total_words': 'Total Words', 'email': 'User'})
+                st.plotly_chart(fig1, use_container_width=True)
+                
+                # Streaks
+                fig2 = px.bar(df, x='email', y='current_streak',
+                             title='Current Writing Streaks',
+                             labels={'current_streak': 'Streak (days)', 'email': 'User'})
+                st.plotly_chart(fig2, use_container_width=True)
+                
+                # Account age distribution
+                fig3 = px.histogram(df, x='age_days',
+                                   title='Account Age Distribution',
+                                   labels={'age_days': 'Days'})
+                st.plotly_chart(fig3, use_container_width=True)
+        
+        with tab3:
+            st.warning("⚠️ **Delete Users - This cannot be undone!**")
+            st.markdown("Select users to delete:")
+            
+            # Reusable index_data for deletion
+            with open(index_file, 'r') as f:
+                index_data = json.load(f)
+            
+            for user in users:
+                col1, col2, col3, col4, col5 = st.columns([2, 2, 1, 1, 1])
+                with col1:
+                    st.write(user['email'])
+                with col2:
+                    st.write(user['name'] or 'No name')
+                with col3:
+                    st.write(f"📝 {user['response_count']}")
+                with col4:
+                    st.write(f"📅 {user['age_days']}d")
+                with col5:
+                    if st.button(f"🗑️", key=f"del_admin_{user['id']}"):
+                        try:
+                            # Delete account file
+                            acc_file = Path(f"accounts/{user['id']}_account.json")
+                            if acc_file.exists():
+                                acc_file.unlink()
+                            
+                            # Remove from index
+                            if user['id'] in index_data:
+                                del index_data[user['id']]
+                                with open(index_file, 'w') as f:
+                                    json.dump(index_data, f, indent=2)
+                            
+                            # Delete user data file
+                            data_file = Path(get_user_filename(user['id']))
+                            if data_file.exists():
+                                data_file.unlink()
+                            
+                            # Delete session file
+                            session_file = Path(SESSION_DIR) / f"{user['id']}.session"
+                            if session_file.exists():
+                                session_file.unlink()
+                            
+                            # Delete backups
+                            backup_dir = Path("backups")
+                            for backup_file in backup_dir.glob(f"{user['id']}_*.json"):
+                                backup_file.unlink()
+                            
+                            st.success(f"✅ Deleted {user['email']}")
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
     
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# ============================================================================
-# AUTHENTICATION UI
-# ============================================================================
 # ============================================================================
 # AUTHENTICATION UI
 # ============================================================================
