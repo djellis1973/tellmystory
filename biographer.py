@@ -5228,7 +5228,7 @@ if st.session_state.get('show_profile_setup', False):
                     st.rerun()
         
         with col_close:
-            if st.button("✕ Close Profile", use_container_width=True):
+            if st.form_submit_button("✕ Close Profile", use_container_width=True):
                 st.session_state.show_profile_setup = False
                 st.rerun()
     
