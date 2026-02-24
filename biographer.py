@@ -5092,6 +5092,304 @@ if st.session_state.get('show_publisher', False):
         """, unsafe_allow_html=True)
     
     stories_for_export = []
+    vignettes_for_export = []  # ← ADD THIS LINE HERE
+    
+    if st.session_state.logged_in and st.session_state.user_id:
+        for session in SESSIONS:
+            sid = session["id"]
+            sdata = st.session_state.responses.get(sid, {})
+            
+            for question_text, answer_data in sdata.get("questions", {}).items():
+                images_with_data = []
+                if answer_data.get("images") and st.session_state.image_handler:
+                    for img_ref in answer_data.get("images", []):
+                        img_id = img_ref.get("id")
+                        b64 = st.session_state.image_handler.get_image_base64(img_id) if st.session_state.image_handler else None
+                        if b64:
+                            images_with_data.append({
+                                "id": img_id,
+                                "base64": b64,
+                                "caption": img_ref.get("caption", "")
+                            })
+                
+                story_item = {
+                    "question": question_text,
+                    "answer_text": answer_data.get("answer", ""),
+                    "timestamp": answer_data.get("timestamp", ""),
+                    "session_id": sid,
+                    "session_title": session["title"],
+                    "has_images": answer_data.get("has_images", False),
+                    "image_count": answer_data.get("image_count", 0),
+                    "images": images_with_data
+                }
+                stories_for_export.append(story_item)
+        
+        # ===== ADD THIS NEW BLOCK - LOAD VIGNETTES =====
+        try:
+            from vignettes import VignetteManager
+            vignette_mgr = VignetteManager(st.session_state.user_id)
+            
+            # Load all published vignettes
+            for v in vignette_mgr.vignettes:
+                if not v.get('is_draft', True):  # Only include published ones
+                    vignettes_for_export.append({
+                        "id": v.get('id', ''),
+                        "title": v.get('title', 'Untitled Vignette'),
+                        "content": v.get('content', ''),
+                        "theme": v.get('theme', 'General'),
+                        "mood": v.get('mood', 'Reflective'),
+                        "word_count": v.get('word_count', 0),
+                        "images": v.get('images', []),
+                        "created_at": v.get('created_at', ''),
+                        "updated_at": v.get('updated_at', '')
+                    })
+        except Exception as e:
+            logger.error(f"Error loading vignettes: {e}")
+            vignettes_for_export = []
+        # ===== END OF NEW BLOCK =====
+        
+        if stories_for_export:
+            col1, col2 = st.columns(2)
+            with col1:
+                profile = st.session_state.user_account.get('profile', {})
+                default_title = f"{profile.get('first_name', 'My')}'s Story"
+                book_title = st.text_input("Book Title", value=default_title, key="publisher_title_input")
+            with col2:
+                default_author = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+                book_author = st.text_input("Author Name", value=default_author if default_author else "Author Name", 
+                                           key="publisher_author_input")
+            
+            st.markdown("---")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                format_style = st.radio(
+                    "📝 Format Style",
+                    ["interview", "biography"],
+                    format_func=lambda x: {
+                        "interview": "Show Questions & Answers", 
+                        "biography": "Just Answers (Biography Style)"
+                    }[x],
+                    horizontal=True,
+                    key="publisher_format_radio"
+                )
+            with col2:
+                include_toc = st.checkbox("📖 Table of Contents", value=True, key="publisher_toc_chk")
+            with col3:
+                cover_choice = st.radio(
+                    "🎨 Cover Type",
+                    ["simple", "uploaded"],
+                    format_func=lambda x: {
+                        "simple": "Simple Gradient Cover",
+                        "uploaded": "Use My Uploaded Image"
+                    }[x],
+                    horizontal=True,
+                    key="publisher_cover_radio"
+                )
+            
+            uploaded_cover = None
+            if cover_choice == "uploaded":
+                st.markdown("---")
+                st.markdown("### 🖼️ Upload Cover Image")
+                uploaded_cover = st.file_uploader(
+                    "Choose an image (JPG or PNG)", 
+                    type=['jpg', 'jpeg', 'png'], 
+                    key="publisher_cover_upload"
+                )
+                if uploaded_cover:
+                    st.image(uploaded_cover, width=200, caption="Your cover image")
+                    st.success("✅ Cover image ready")
+            
+            st.markdown("---")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Stories", len(stories_for_export))
+            with col2:
+                total_sessions = len(set(s['session_id'] for s in stories_for_export))
+                st.metric("Sessions", total_sessions)
+            with col3:
+                total_images = sum(len(s.get('images', [])) for s in stories_for_export)
+                st.metric("Images", total_images)
+            with col4:
+                total_words = sum(len(s.get('answer_text', '').split()) for s in stories_for_export)
+                st.metric("Words", f"{total_words:,}")
+            
+            with st.expander("📖 Preview First 3 Stories", expanded=False):
+                for i, story in enumerate(stories_for_export[:3]):
+                    if format_style == "interview":
+                        st.markdown(f"**Q: {story.get('question', '')}**")
+                    else:
+                        st.markdown(f"**{story.get('session_title', 'Session')}**")
+                    
+                    preview_text = clean_text_for_export(story.get('answer_text', ''))[:300]
+                    st.markdown(f"{preview_text}...")
+                    
+                    if story.get('images'):
+                        st.caption(f"📸 {len(story['images'])} image(s)")
+                    if i < 2:
+                        st.divider()
+            
+            st.markdown("---")
+            st.markdown("### 🖨️ Generate Your Book")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                if st.button("📊 DOCX", key="generate_docx_btn", type="primary", use_container_width=True):
+                    with st.spinner("Creating Word document..."):
+                        cover_image_data = uploaded_cover.getvalue() if uploaded_cover else None
+                        
+                        docx_bytes = generate_docx_book(
+                            book_title,
+                            book_author,
+                            stories_for_export,
+                            format_style,
+                            include_toc,
+                            True,
+                            cover_image_data,
+                            cover_choice
+                        )
+                        
+                        if docx_bytes:
+                            filename = f"{book_title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.docx"
+                            
+                            st.download_button(
+                                "📥 Download DOCX", 
+                                data=docx_bytes, 
+                                file_name=filename, 
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+                                use_container_width=True,
+                                key="docx_download_btn"
+                            )
+                            show_celebration()
+            
+            with col2:
+                if st.button("🌐 HTML", key="generate_html_btn", type="primary", use_container_width=True):
+                    with st.spinner("Creating HTML page..."):
+                        cover_image_data = uploaded_cover.getvalue() if uploaded_cover else None
+                        
+                        html_content = generate_html_book(
+                            book_title,
+                            book_author,
+                            stories_for_export,
+                            format_style,
+                            include_toc,
+                            True,
+                            cover_image_data,
+                            cover_choice
+                        )
+                        
+                        if html_content:
+                            filename = f"{book_title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.html"
+                            
+                            st.download_button(
+                                "📥 Download HTML", 
+                                data=html_content, 
+                                file_name=filename, 
+                                mime="text/html", 
+                                use_container_width=True,
+                                key="html_download_btn"
+                            )
+                            show_celebration()
+            
+            with col3:
+                if st.button("📱 EPUB", key="generate_epub_btn", type="primary", use_container_width=True):
+                    with st.spinner("Creating EPUB file..."):
+                        cover_image_data = uploaded_cover.getvalue() if uploaded_cover else None
+                        
+                        epub_bytes, error = generate_epub_book(
+                            book_title,
+                            book_author,
+                            stories_for_export,
+                            format_style,
+                            include_toc,
+                            True,
+                            cover_image_data,
+                            cover_choice
+                        )
+                        
+                        if epub_bytes:
+                            filename = f"{book_title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.epub"
+                            st.download_button(
+                                "📥 Download EPUB", 
+                                data=epub_bytes, 
+                                file_name=filename, 
+                                mime="application/epub+zip", 
+                                use_container_width=True,
+                                key="epub_download_btn"
+                            )
+                            show_celebration()
+                        else:
+                            st.error(f"Failed to generate EPUB: {error}")
+                            st.info("💡 Install ebooklib: pip install ebooklib")
+            
+            with col4:
+                if st.button("📝 RTF", key="generate_rtf_btn", type="primary", use_container_width=True):
+                    with st.spinner("Creating RTF file..."):
+                        cover_image_data = uploaded_cover.getvalue() if uploaded_cover else None
+                        
+                        rtf_bytes = generate_rtf_book(
+                            book_title,
+                            book_author,
+                            stories_for_export,
+                            format_style,
+                            include_toc,
+                            True,
+                            cover_image_data,
+                            cover_choice
+                        )
+                        
+                        if rtf_bytes:
+                            filename = f"{book_title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.rtf"
+                            st.download_button(
+                                "📥 Download RTF", 
+                                data=rtf_bytes, 
+                                file_name=filename, 
+                                mime="application/rtf", 
+                                use_container_width=True,
+                                key="rtf_download_btn"
+                            )
+                            show_celebration()
+                        else:
+                            st.error("Failed to generate RTF")
+            
+            with st.expander("📦 JSON Backup", expanded=False):
+                complete_data = {
+                    "user": st.session_state.user_id,
+                    "user_profile": st.session_state.user_account.get('profile', {}),
+                    "book_title": book_title,
+                    "book_author": book_author,
+                    "stories": stories_for_export,
+                    "vignettes": vignettes_for_export,  # ← ADD THIS LINE
+                    "export_date": datetime.now().isoformat(),
+                    "summary": {
+                        "total_stories": len(stories_for_export),
+                        "total_vignettes": len(vignettes_for_export),  # ← ADD THIS LINE
+                        "total_sessions": total_sessions,
+                        "total_words": total_words
+                    }
+                }
+                json_data = json.dumps(complete_data, indent=2)
+                st.download_button(
+                    label="📥 Download JSON Backup", 
+                    data=json_data,
+                    file_name=f"Tell_My_Story_Backup_{st.session_state.user_id}.json",
+                    mime="application/json", 
+                    use_container_width=True,
+                    key="json_backup_publisher_btn"
+                )
+        
+        else:
+            st.warning("No stories found! Start writing to publish your book.")
+            if st.button("← Return to Main App", key="return_from_publisher_btn"):
+                st.session_state.show_publisher = False
+                st.rerun()
+    else:
+        st.warning("Please log in to publish your book.")
+        if st.button("← Return to Main App", key="return_from_publisher_no_user_btn"):
+            st.session_state.show_publisher = False
+            st.rerun()
+    
+    st.stop()
     
     if st.session_state.logged_in and st.session_state.user_id:
         for session in SESSIONS:
