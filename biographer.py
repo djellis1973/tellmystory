@@ -219,9 +219,6 @@ validate_environment()
 # ============================================================================
 def add_simple_recording_button():
     """Simple browser-based screen recording with guaranteed download"""
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎥 Record Demo")
-    
     recording_html = """
     <div style="text-align: center; font-family: Arial, sans-serif;">
         <button onclick="startRecording()" style="background-color: #ff4444; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-bottom: 10px; width: 100%;">🔴 START RECORDING</button>
@@ -255,17 +252,14 @@ def add_simple_recording_button():
                     type: 'video/webm'
                 });
                 
-                // Create download link
                 const url = URL.createObjectURL(blob);
                 const filename = 'demo_recording_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.webm';
                 
-                // Show download button
                 const downloadDiv = document.getElementById('downloadLink');
                 downloadDiv.innerHTML = '<a href="' + url + '" download="' + filename + '" style="background-color: #3498db; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 10px;">📥 CLICK HERE TO DOWNLOAD VIDEO</a>';
                 
                 document.getElementById('recordingStatus').innerHTML = '✅ Recording complete! Click the button above to save.';
                 
-                // Auto-trigger download as backup
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = filename;
