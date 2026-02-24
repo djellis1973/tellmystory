@@ -263,6 +263,7 @@ beta_reader = BetaReader(client) if BetaReader and client else None
 default_state = {
     "qb_manager": None, 
     "qb_manager_initialized": False, 
+    "show_settings": False,
     "user_id": None, 
     "logged_in": False,
     "current_session": 0, 
