@@ -4026,11 +4026,11 @@ if st.session_state.get('show_prompt_modal', False) and st.session_state.get('cu
 if st.session_state.get('show_admin', False):
     show_admin_panel()
     st.stop()
-
-if st.session_state.show_privacy_settings:
-    show_privacy_settings()
+    
+if st.session_state.get('show_settings', False):
+    show_settings_panel()
     st.stop()
-
+    
 if st.session_state.show_bank_manager:
     show_bank_manager()
     if st.session_state.show_bank_manager:
