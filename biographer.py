@@ -3662,6 +3662,101 @@ def show_admin_panel():
         st.metric("Users w/ Content", users_with_content)
     
     st.divider()
+
+     # ========== MASTER BACKUP BUTTON ==========
+    st.markdown("### 💾 Master Backup")
+    st.info("Create a complete backup of all user accounts, stories, and sessions")
+    
+    if st.button("📥 CREATE MASTER BACKUP", type="primary", use_container_width=True):
+        with st.spinner("Creating master backup..."):
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                # 1. Backup all user accounts
+                accounts_backup = {}
+                accounts_dir = Path("accounts")
+                for acc_file in accounts_dir.glob("*_account.json"):
+                    with open(acc_file, 'r') as f:
+                        user_id = acc_file.stem.replace("_account", "")
+                        accounts_backup[user_id] = json.load(f)
+                
+                # 2. Backup all user data
+                users_data = {}
+                for data_file in Path(".").glob("user_data_*.json"):
+                    with open(data_file, 'r') as f:
+                        users_data[data_file.stem] = json.load(f)
+                
+                # 3. Backup all sessions
+                sessions = {}
+                session_dir = Path("persistent_sessions")
+                if session_dir.exists():
+                    for sess_file in session_dir.glob("*.session"):
+                        with open(sess_file, 'r') as f:
+                            sessions[sess_file.stem] = json.load(f)
+                
+                # 4. Backup question banks
+                banks = {}
+                banks_dir = Path("question_banks")
+                if banks_dir.exists():
+                    for bank_file in banks_dir.rglob("*.csv"):
+                        with open(bank_file, 'r') as f:
+                            banks[str(bank_file)] = f.read()
+                
+                # 5. Backup auto_backups (metadata about backups)
+                auto_backups = {}
+                auto_dir = Path("auto_backups")
+                if auto_dir.exists():
+                    for backup_file in auto_dir.glob("*.json"):
+                        with open(backup_file, 'r') as f:
+                            auto_backups[backup_file.name] = json.load(f)
+                
+                # Create complete backup
+                complete_backup = {
+                    "backup_date": datetime.now().isoformat(),
+                    "app_version": st.session_state.get("app_version", "2.0.0"),
+                    "total_users": len(accounts_backup),
+                    "accounts": accounts_backup,
+                    "user_data": users_data,
+                    "sessions": sessions,
+                    "question_banks": banks,
+                    "auto_backups": auto_backups,
+                    "summary": {
+                        "total_users": len(accounts_backup),
+                        "total_words": sum(u.get("stats", {}).get("total_words", 0) for u in accounts_backup.values()),
+                        "total_sessions": sum(len(s) for s in sessions.values())
+                    }
+                }
+                
+                # Save to file
+                backup_dir = Path("master_backups")
+                backup_dir.mkdir(exist_ok=True)
+                backup_file = backup_dir / f"master_backup_{timestamp}.json"
+                with open(backup_file, 'w') as f:
+                    json.dump(complete_backup, f, indent=2)
+                
+                # Create downloadable JSON
+                backup_json = json.dumps(complete_backup, indent=2)
+                
+                st.success(f"✅ Master backup created with {len(accounts_backup)} users!")
+                
+                st.download_button(
+                    label="📥 DOWNLOAD MASTER BACKUP",
+                    data=backup_json,
+                    file_name=f"tellmystory_master_backup_{timestamp}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    key="download_master_backup"
+                )
+                
+            except Exception as e:
+                st.error(f"Backup failed: {str(e)}")
+                logger.error(f"Master backup error: {e}")
+    
+    st.divider()
+    
+    if not users:
+        st.info("No users found")
+    else:
     
     if not users:
         st.info("No users found")
