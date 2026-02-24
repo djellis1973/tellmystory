@@ -5092,46 +5092,22 @@ if st.session_state.get('show_publisher', False):
         """, unsafe_allow_html=True)
     
     stories_for_export = []
-    vignettes_for_export = []  # ← ADD THIS LINE HERE
-    
-    if st.session_state.logged_in and st.session_state.user_id:
-        for session in SESSIONS:
-            sid = session["id"]
-            sdata = st.session_state.responses.get(sid, {})
-            
-            for question_text, answer_data in sdata.get("questions", {}).items():
-                images_with_data = []
-                if answer_data.get("images") and st.session_state.image_handler:
-                    for img_ref in answer_data.get("images", []):
-                        img_id = img_ref.get("id")
-                        b64 = st.session_state.image_handler.get_image_base64(img_id) if st.session_state.image_handler else None
-                        if b64:
-                            images_with_data.append({
-                                "id": img_id,
-                                "base64": b64,
-                                "caption": img_ref.get("caption", "")
-                            })
-                
-                story_item = {
-                    "question": question_text,
-                    "answer_text": answer_data.get("answer", ""),
-                    "timestamp": answer_data.get("timestamp", ""),
-                    "session_id": sid,
-                    "session_title": session["title"],
-                    "has_images": answer_data.get("has_images", False),
-                    "image_count": answer_data.get("image_count", 0),
-                    "images": images_with_data
-                }
-                stories_for_export.append(story_item)
-        
-        # ===== ADD THIS NEW BLOCK - LOAD VIGNETTES =====
+        vignettes_for_export = []
+        st.write("--- VIGNETTE DEBUG INFO ---")
         try:
             from vignettes import VignetteManager
             vignette_mgr = VignetteManager(st.session_state.user_id)
             
-            # Load all published vignettes
-            for v in vignette_mgr.vignettes:
-                if not v.get('is_draft', True):  # Only include published ones
+            st.write(f"Total vignettes found: {len(vignette_mgr.vignettes)}")
+            
+            for i, v in enumerate(vignette_mgr.vignettes):
+                st.write(f"Vignette {i+1}:")
+                st.write(f"  Title: {v.get('title')}")
+                st.write(f"  is_draft: {v.get('is_draft')}")
+                st.write(f"  is_published: {v.get('is_published')}")
+                st.write(f"  ID: {v.get('id')}")
+                
+                if not v.get('is_draft', True):
                     vignettes_for_export.append({
                         "id": v.get('id', ''),
                         "title": v.get('title', 'Untitled Vignette'),
@@ -5143,9 +5119,15 @@ if st.session_state.get('show_publisher', False):
                         "created_at": v.get('created_at', ''),
                         "updated_at": v.get('updated_at', '')
                     })
+            
+            st.write(f"Published vignettes found: {len(vignettes_for_export)}")
+            
         except Exception as e:
-            logger.error(f"Error loading vignettes: {e}")
+            st.error(f"Error loading vignettes: {e}")
+            import traceback
+            st.error(traceback.format_exc())
             vignettes_for_export = []
+        st.write("--- END VIGNETTE DEBUG ---")
         # ===== END OF NEW BLOCK =====
         
         if stories_for_export:
