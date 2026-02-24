@@ -3881,62 +3881,7 @@ if not st.session_state.logged_in:
                         st.error(f"Error: {result.get('error', 'Unknown error')}")
     st.stop()
 
-# ============================================================================
-# PROFILE SETUP MODAL
-# ============================================================================
-if st.session_state.get('show_profile_setup', False):
-    # Hide the main header when modal is open
-    st.markdown("""
-    <style>
-    .main-header, .stApp header, [data-testid="stHeader"] {
-        display: none !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    st.markdown('<div class="profile-setup-modal">', unsafe_allow_html=True)
-    st.title("👤 Your Complete Life Story Profile")
-    st.markdown("### 📝 Basic Information")
-    with st.form("profile_setup_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            gender = st.radio("Gender", ["Male", "Female", "Other", "Prefer not to say"], horizontal=True, key="modal_gender_radio")
-        with col2:
-            account_for = st.radio("Account Type", ["For me", "For someone else"], key="modal_account_type_radio", horizontal=True)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1: 
-            birth_month = st.selectbox("Birth Month", ["January","February","March","April","May","June","July","August","September","October","November","December"], key="modal_month_select")
-        with col2: 
-            birth_day = st.selectbox("Birth Day", list(range(1,32)), key="modal_day_select")
-        with col3: 
-            birth_year = st.selectbox("Birth Year", list(range(datetime.now().year, datetime.now().year-120, -1)), key="modal_year_select")
-        
-        col_save, col_close = st.columns([3, 1])
-        with col_save:
-            if st.form_submit_button("💾 Save Basic Information", type="primary", use_container_width=True):
-                if birth_month and birth_day and birth_year:
-                    birthdate = f"{birth_month} {birth_day}, {birth_year}"
-                    if st.session_state.user_account:
-                        st.session_state.user_account['profile'].update({
-                            'gender': gender, 'birthdate': birthdate, 'timeline_start': birthdate
-                        })
-                        st.session_state.user_account['account_type'] = "self" if account_for == "For me" else "other"
-                        save_account_data(st.session_state.user_account)
-                    st.success("Basic information saved!")
-                    st.rerun()
-        with col_close:
-            if st.form_submit_button("✕ Close Profile", use_container_width=True):
-                st.session_state.show_profile_setup = False
-                st.rerun()
-    
-    st.divider()
-    render_narrative_gps()
-    st.divider()
-    render_enhanced_profile()
-    st.divider()
-    
-
+   
 # ============================================================================
 # MODAL HANDLING
 # ============================================================================
@@ -5237,7 +5182,60 @@ if st.session_state.get('show_publisher', False):
             st.rerun()
     
     st.stop()
-
+# ============================================================================
+# PROFILE SETUP MODAL
+# ============================================================================
+if st.session_state.get('show_profile_setup', False):
+    # Hide the main header when modal is open
+    st.markdown("""
+    <style>
+    .main-header, .stApp header, [data-testid="stHeader"] {
+        display: none !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="profile-setup-modal">', unsafe_allow_html=True)
+    st.title("👤 Your Complete Life Story Profile")
+    st.markdown("### 📝 Basic Information")
+    with st.form("profile_setup_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            gender = st.radio("Gender", ["Male", "Female", "Other", "Prefer not to say"], horizontal=True, key="modal_gender_radio")
+        with col2:
+            account_for = st.radio("Account Type", ["For me", "For someone else"], key="modal_account_type_radio", horizontal=True)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1: 
+            birth_month = st.selectbox("Birth Month", ["January","February","March","April","May","June","July","August","September","October","November","December"], key="modal_month_select")
+        with col2: 
+            birth_day = st.selectbox("Birth Day", list(range(1,32)), key="modal_day_select")
+        with col3: 
+            birth_year = st.selectbox("Birth Year", list(range(datetime.now().year, datetime.now().year-120, -1)), key="modal_year_select")
+        
+        col_save, col_close = st.columns([3, 1])
+        with col_save:
+            if st.form_submit_button("💾 Save Basic Information", type="primary", use_container_width=True):
+                if birth_month and birth_day and birth_year:
+                    birthdate = f"{birth_month} {birth_day}, {birth_year}"
+                    if st.session_state.user_account:
+                        st.session_state.user_account['profile'].update({
+                            'gender': gender, 'birthdate': birthdate, 'timeline_start': birthdate
+                        })
+                        st.session_state.user_account['account_type'] = "self" if account_for == "For me" else "other"
+                        save_account_data(st.session_state.user_account)
+                    st.success("Basic information saved!")
+                    st.rerun()
+        with col_close:
+            if st.form_submit_button("✕ Close Profile", use_container_width=True):
+                st.session_state.show_profile_setup = False
+                st.rerun()
+    
+    st.divider()
+    render_narrative_gps()
+    st.divider()
+    render_enhanced_profile()
+    st.divider()
 # ============================================================================
 # MAIN CONTENT AREA
 # ============================================================================
