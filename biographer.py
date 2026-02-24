@@ -213,7 +213,30 @@ def validate_environment():
         logger.info("OpenAI API key found")
 
 validate_environment()
-
+        
+# ============================================================================
+# ADD THE RECORDING FUNCTION HERE (AFTER LINE 574)
+# ============================================================================
+def add_recording_button():
+    """Add a demo recording button"""
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎥 Demo Recording")
+    
+    if st.sidebar.button("🎬 Start Recording", type="primary", use_container_width=True):
+        st.sidebar.info("""
+        **Recording started!**
+        
+        Press **R** to stop recording
+        Video saves to your Downloads folder
+        """)
+        
+        st.components.v1.html("""
+        <script>
+        window.parent.postMessage({
+            type: "streamlit:start_recording"
+        }, "*");
+        </script>
+        """)
 # ============================================================================
 # IMPORTS WITH ERROR HANDLING
 # ============================================================================
@@ -4214,7 +4237,16 @@ with st.sidebar:
     if st.session_state.user_account:
         profile = st.session_state.user_account['profile']
         st.success(f"✓ **{profile['first_name']} {profile['last_name']}**")
+   
+    # ADD THIS EXACT LINE AFTER LINE 1875 ⬇️
+    add_recording_button()
     
+    if st.button("📝 Complete Profile", key="complete_profile_btn", use_container_width=True): 
+        st.session_state.show_profile_setup = True
+        st.rerun()
+    
+    if st.button("🚪 Log Out", key="logout_btn", use_container_width=True): 
+        logout_user()
     if st.button("📝 Complete Profile", key="complete_profile_btn", use_container_width=True): 
         st.session_state.show_profile_setup = True
         st.rerun()
