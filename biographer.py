@@ -222,8 +222,11 @@ def add_recording_button():
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎥 Demo Recording")
     
-    # Use a completely unique key for this button
-    if st.sidebar.button("🎬 Start Recording", key="demo_recording_button_2026_02_24", type="primary", use_container_width=True):
+    # Use a timestamp and random number to guarantee uniqueness
+    import random
+    unique_key = f"demo_rec_btn_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000,9999)}"
+    
+    if st.sidebar.button("🎬 Start Recording", key=unique_key, type="primary", use_container_width=True):
         st.sidebar.info("""
         **Recording started!**
         
