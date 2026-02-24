@@ -137,6 +137,11 @@
     color: #b85e00;
 }
 
+.modal-overlay {
+    padding: 2rem;
+    margin: 1rem;
+}
+
 .auth-container {
     max-width: 500px;
     margin: 3rem auto;
