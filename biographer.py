@@ -4293,6 +4293,30 @@ if st.session_state.show_session_creator:
 # ============================================================================
 # MAIN HEADER WITH PROMINENT SUPPORT BUTTON
 # ============================================================================
+# Initialize session state for sidebar visibility if not exists
+if 'sidebar_hidden' not in st.session_state:
+    st.session_state.sidebar_hidden = False
+
+# Apply sidebar visibility based on session state
+if st.session_state.sidebar_hidden:
+    st.markdown("""
+    <style>
+    /* Hide the sidebar completely */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0px !important;
+    }
+    
+    /* Expand main content to full width */
+    .main .block-container {
+        max-width: 1200px !important;
+        padding-left: 5rem !important;
+        padding-right: 5rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 col_logo, col_title, col_focus, col_support = st.columns([1, 2, 1, 1])
 with col_logo:
     st.markdown(f'<img src="{LOGO_URL}" class="logo-img" style="max-width:100px;">', unsafe_allow_html=True)
@@ -4300,12 +4324,9 @@ with col_title:
     st.markdown('<h1 style="margin-top:20px;">Tell My Story</h1>', unsafe_allow_html=True)
 with col_focus:
     st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
-    if st.button("🧘 FOCUS MODE", key="focus_btn", type="primary", use_container_width=True):
-        st.markdown("""
-        <style>
-        section[data-testid="stSidebar"] { display: none !important; }
-        </style>
-        """, unsafe_allow_html=True)
+    button_label = "📖 EXIT FOCUS" if st.session_state.sidebar_hidden else "🧘 FOCUS MODE"
+    if st.button(button_label, key="focus_btn", type="primary", use_container_width=True):
+        st.session_state.sidebar_hidden = not st.session_state.sidebar_hidden
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 with col_support:
