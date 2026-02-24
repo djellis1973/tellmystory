@@ -4158,16 +4158,7 @@ with st.sidebar:
     render_gamification_dashboard()
     
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # REST OF YOUR SIDEBAR (Tools, Question Banks, Sessions, etc.)
-    st.divider()
-    st.header("🔧 Tools")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔒 Privacy", key="privacy_tool_btn", use_container_width=True):
-            st.session_state.show_privacy_settings = True
-            st.rerun()
-       
+         
     st.divider()
     st.header("📚 Question Banks")
     if st.button("📋 Bank Manager", key="bank_manager_sidebar_btn", use_container_width=True, type="primary"): 
