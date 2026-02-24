@@ -3995,7 +3995,9 @@ if st.session_state.show_session_creator:
 # Initialize session state for sidebar visibility if not exists
 if 'sidebar_hidden' not in st.session_state:
     st.session_state.sidebar_hidden = False
-
+st.write("Debug - Current session:", st.session_state.current_session)
+st.write("Debug - Question bank:", st.session_state.current_question_bank)
+st.write("Debug - Logged in:", st.session_state.logged_in)
 # Apply sidebar visibility based on session state
 if st.session_state.sidebar_hidden:
     st.markdown("""
