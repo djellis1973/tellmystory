@@ -5251,6 +5251,7 @@ st.write("Debug - Modal states:", {
     "show_profile_setup": st.session_state.show_profile_setup,
     "show_ai_rewrite": st.session_state.show_ai_rewrite
 })
+st.session_state.show_privacy_settings = False
 if (st.session_state.show_vignette_modal or 
     st.session_state.show_vignette_manager or 
     st.session_state.show_vignette_detail or
