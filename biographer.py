@@ -4376,10 +4376,8 @@ if st.session_state.get('show_support', False):
 # SIDEBAR
 # ============================================================================
 with st.sidebar:
+    # PROFILE SECTION - AT THE TOP
     st.markdown('<div class="sidebar-header"><h2>Tell My Story</h2><p>Your Life Timeline</p></div>', unsafe_allow_html=True)
-    
-    render_gamification_dashboard()
-    st.divider()
     
     st.header("👤 Your Profile")
     if st.session_state.user_account:
@@ -4392,15 +4390,69 @@ with st.sidebar:
     
     if st.button("🚪 Log Out", key="logout_btn", use_container_width=True): 
         logout_user()
-        
+
     # ADMIN BUTTON - Only shows for your email
     if st.session_state.logged_in and st.session_state.user_account:
-        if st.session_state.user_account.get('email') == "davidellis@gmx.es":  # CHANGE THIS!
+        if st.session_state.user_account.get('email') == "davidellis@gmx.es":
             st.divider()
             if st.button("👑 Admin Panel", key="admin_btn", use_container_width=True):
                 st.session_state.show_admin = True
                 st.rerun()
-                
+    
+    st.divider()
+    
+    # SEARCH BOX - MOVED UP HERE
+    st.subheader("🔍 Search Your Stories")
+    search_query = st.text_input("Search answers & captions...", placeholder="e.g., childhood, wedding, photo", key="global_search_input")
+    if search_query and len(search_query) >= 2:
+        results = search_all_answers(search_query)
+        if results:
+            st.success(f"Found {len(results)} matches")
+            with st.expander(f"📖 {len(results)} Results", expanded=True):
+                for i, r in enumerate(results[:10]):
+                    st.markdown(f"**Session {r['session_id']}: {r['session_title']}**  \n*{r['question']}*")
+                    if r.get('has_images'):
+                        st.caption(f"📸 Contains {r.get('image_count', 1)} photo(s)")
+                    st.markdown(f"{r['answer'][:150]}...")
+                    if st.button(f"Go to Session", key=f"srch_go_{i}_{r['session_id']}", use_container_width=True):
+                        for idx, s in enumerate(SESSIONS):
+                            if s["id"] == r['session_id']:
+                                st.session_state.update(current_session=idx, current_question_override=r['question'], show_ai_rewrite_menu=False)
+                                st.rerun()
+                    st.divider()
+                if len(results) > 10: 
+                    st.info(f"... and {len(results)-10} more matches")
+        else: 
+            st.info("No matches found")
+    
+    st.divider()
+    
+    # SMALLER STREAK BOX - Custom CSS to make it compact
+    st.markdown("""
+    <style>
+    .compact-streak .streak-box {
+        padding: 10px !important;
+        margin-bottom: 10px !important;
+    }
+    .compact-streak .streak-number {
+        font-size: 32px !important;
+    }
+    .compact-streak .progress-container {
+        height: 6px !important;
+    }
+    .compact-streak .milestone-item {
+        padding: 4px !important;
+        font-size: 12px !important;
+    }
+    </style>
+    <div class="compact-streak">
+    """, unsafe_allow_html=True)
+    
+    render_gamification_dashboard()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # REST OF YOUR SIDEBAR (Tools, Question Banks, Sessions, etc.)
     st.divider()
     st.header("🔧 Tools")
     col1, col2 = st.columns(2)
@@ -4577,30 +4629,7 @@ with st.sidebar:
             st.session_state.confirming_clear = "all"
             st.rerun()
     
-    st.divider()
-    st.subheader("🔍 Search Your Stories")
-    search_query = st.text_input("Search answers & captions...", placeholder="e.g., childhood, wedding, photo", key="global_search_input")
-    if search_query and len(search_query) >= 2:
-        results = search_all_answers(search_query)
-        if results:
-            st.success(f"Found {len(results)} matches")
-            with st.expander(f"📖 {len(results)} Results", expanded=True):
-                for i, r in enumerate(results[:10]):
-                    st.markdown(f"**Session {r['session_id']}: {r['session_title']}**  \n*{r['question']}*")
-                    if r.get('has_images'):
-                        st.caption(f"📸 Contains {r.get('image_count', 1)} photo(s)")
-                    st.markdown(f"{r['answer'][:150]}...")
-                    if st.button(f"Go to Session", key=f"srch_go_{i}_{r['session_id']}", use_container_width=True):
-                        for idx, s in enumerate(SESSIONS):
-                            if s["id"] == r['session_id']:
-                                st.session_state.update(current_session=idx, current_question_override=r['question'], show_ai_rewrite_menu=False)
-                                st.rerun()
-                    st.divider()
-                if len(results) > 10: 
-                    st.info(f"... and {len(results)-10} more matches")
-        else: 
-            st.info("No matches found")
-
+    # REMOVED THE SEARCH BOX FROM HERE - IT'S NOW AT THE TOP
 # ============================================================================
 # PUBLISHER FUNCTIONS - COMPLETE
 # ============================================================================
