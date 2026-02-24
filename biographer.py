@@ -283,6 +283,7 @@ default_state = {
     "custom_topic_input": "",
     "show_custom_topic_modal": False, 
     "show_topic_browser": False, 
+    "show_admin": False,
     "show_session_manager": False,
     "show_session_creator": False, 
     "editing_custom_session": None, 
@@ -3749,7 +3750,86 @@ if not SESSIONS:
         st.session_state.show_bank_manager = True; 
         st.rerun()
     st.stop()
+# ============================================================================
+# SIMPLE ADMIN USER MANAGEMENT
+# ============================================================================
+def show_admin_panel():
+    """Simple admin panel to view and delete users"""
+    st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        st.title("👑 Admin Panel - User Management")
+    with col2:
+        if st.button("✕", key="close_admin_btn"):
+            st.session_state.show_admin = False
+            st.rerun()
+    
+    # Get all users
+    users = []
+    index_file = Path("accounts/accounts_index.json")
+    
+    if index_file.exists():
+        with open(index_file, 'r') as f:
+            index_data = json.load(f)
+            
+        for user_id, user_info in index_data.items():
+            users.append({
+                "id": user_id,
+                "email": user_info.get('email', ''),
+                "name": f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip(),
+                "created": user_info.get('created_at', '')[:10] if user_info.get('created_at') else 'Unknown'
+            })
+    
+    st.write(f"**Total Users:** {len(users)}")
+    st.divider()
+    
+    if not users:
+        st.info("No users found")
+    else:
+        for user in users:
+            col1, col2, col3, col4 = st.columns([2, 2.5, 2, 1])
+            with col1:
+                st.write(f"**{user['name'] or 'No name'}**")
+            with col2:
+                st.write(user['email'])
+            with col3:
+                st.write(f"Joined: {user['created']}")
+            with col4:
+                if st.button(f"🗑️", key=f"del_{user['id']}"):
+                    try:
+                        # Delete account file
+                        acc_file = Path(f"accounts/{user['id']}_account.json")
+                        if acc_file.exists():
+                            acc_file.unlink()
+                        
+                        # Remove from index
+                        if user['id'] in index_data:
+                            del index_data[user['id']]
+                            with open(index_file, 'w') as f:
+                                json.dump(index_data, f, indent=2)
+                        
+                        # Delete user data file
+                        data_file = Path(get_user_filename(user['id']))
+                        if data_file.exists():
+                            data_file.unlink()
+                        
+                        # Delete session file
+                        session_file = Path(SESSION_DIR) / f"{user['id']}.session"
+                        if session_file.exists():
+                            session_file.unlink()
+                        
+                        st.success(f"✅ Deleted {user['email']}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()
 
+# ============================================================================
+# AUTHENTICATION UI
+# ============================================================================
 # ============================================================================
 # AUTHENTICATION UI
 # ============================================================================
@@ -3996,6 +4076,11 @@ if st.session_state.get('show_prompt_modal', False) and st.session_state.get('cu
     show_prompt_me_modal()
     st.stop()
 
+# ADD THIS RIGHT HERE:
+if st.session_state.get('show_admin', False):
+    show_admin_panel()
+    st.stop()
+
 if st.session_state.show_privacy_settings:
     show_privacy_settings()
     st.stop()
@@ -4115,7 +4200,15 @@ with st.sidebar:
     
     if st.button("🚪 Log Out", key="logout_btn", use_container_width=True): 
         logout_user()
-    
+        
+    # ADMIN BUTTON - Only shows for your email
+    if st.session_state.logged_in and st.session_state.user_account:
+        if st.session_state.user_account.get('email') == "davidellis@gmx.es":  # CHANGE THIS!
+            st.divider()
+            if st.button("👑 Admin Panel", key="admin_btn", use_container_width=True):
+                st.session_state.show_admin = True
+                st.rerun()
+                
     st.divider()
     st.header("🔧 Tools")
     col1, col2 = st.columns(2)
