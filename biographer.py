@@ -5352,11 +5352,6 @@ if content_key not in st.session_state:
         st.session_state[content_key] = "<p>Start writing your story here...</p>"
 
 st.markdown("### ✍️ Your Story")
-st.markdown("""
-<div class="image-drop-info">
-    📸 <strong>Drag & drop images</strong> directly into the editor.
-</div>
-""", unsafe_allow_html=True)
 
 question_text_safe = "".join(c for c in current_question_text if c.isalnum() or c.isspace()).replace(" ", "_")[:30]
 editor_component_key = f"quill_editor_{current_session_id}_{question_text_safe}_v{st.session_state[version_key]}"
@@ -5396,6 +5391,13 @@ except Exception as e:
     )
     if content:
         st.session_state[content_key] = f"<p>{content}</p>"
+
+st.markdown("""
+<div class="image-drop-info">
+    📸 <strong>Drag & drop images</strong> directly into the editor.
+</div>
+""", unsafe_allow_html=True)
+
 
 st.markdown("---")
 
