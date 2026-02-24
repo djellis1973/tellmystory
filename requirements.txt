@@ -4,3 +4,5 @@ python-docx==1.1.0
 streamlit-quill>=0.0.2
 Pillow>=10.0.0
 EbookLib>=0.18
+plotly
+pandas
