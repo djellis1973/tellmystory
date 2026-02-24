@@ -3750,6 +3750,102 @@ def show_admin_panel():
             except Exception as e:
                 st.error(f"Backup failed: {str(e)}")
                 logger.error(f"Master backup error: {e}")
+
+        # ========== MASTER RESTORE BUTTON ==========
+    st.markdown("### 🔄 Master Restore")
+    st.error("⚠️ **WARNING: This will COMPLETELY OVERWRITE all existing data!**")
+    st.info("Upload a master backup file to restore everything (accounts, user data, sessions)")
+    
+    uploaded_backup = st.file_uploader(
+        "Choose master backup file",
+        type=['json'],
+        key="master_restore_uploader",
+        help="Upload a master backup JSON file"
+    )
+    
+    if uploaded_backup is not None:
+        file_size_kb = len(uploaded_backup.getvalue()) / 1024
+        st.warning(f"📄 Selected: {uploaded_backup.name} ({file_size_kb:.1f} KB)")
+        
+        col_confirm, col_cancel = st.columns(2)
+        with col_confirm:
+            if st.button("⚠️ CONFIRM RESTORE", type="primary", use_container_width=True):
+                with st.spinner("Restoring master backup... THIS WILL OVERWRITE ALL DATA!"):
+                    try:
+                        backup_content = uploaded_backup.read().decode('utf-8')
+                        backup_data = json.loads(backup_content)
+                        
+                        # 1. Restore accounts
+                        accounts_dir = Path("accounts")
+                        accounts_dir.mkdir(exist_ok=True)
+                        
+                        # Clear existing accounts first
+                        for old_acc in accounts_dir.glob("*.json"):
+                            old_acc.unlink()
+                        
+                        # Restore account files
+                        index_data = {}
+                        for user_id, account_data in backup_data.get("accounts", {}).items():
+                            # Save account file
+                            with open(accounts_dir / f"{user_id}_account.json", 'w') as f:
+                                json.dump(account_data, f, indent=2)
+                            
+                            # Build index
+                            index_data[user_id] = {
+                                "email": account_data.get("email", ""),
+                                "first_name": account_data.get("profile", {}).get("first_name", ""),
+                                "last_name": account_data.get("profile", {}).get("last_name", ""),
+                                "created_at": account_data.get("created_at", ""),
+                                "account_type": account_data.get("account_type", "self")
+                            }
+                        
+                        # Restore accounts index
+                        with open(accounts_dir / "accounts_index.json", 'w') as f:
+                            json.dump(index_data, f, indent=2)
+                        
+                        # 2. Restore user data files
+                        for filename, user_data in backup_data.get("user_data", {}).items():
+                            with open(f"{filename}.json", 'w') as f:
+                                json.dump(user_data, f, indent=2)
+                        
+                        # 3. Restore sessions
+                        session_dir = Path("persistent_sessions")
+                        session_dir.mkdir(exist_ok=True)
+                        
+                        # Clear existing sessions
+                        for old_sess in session_dir.glob("*.session"):
+                            old_sess.unlink()
+                        
+                        for user_id, session_data in backup_data.get("sessions", {}).items():
+                            with open(session_dir / f"{user_id}.session", 'w') as f:
+                                json.dump(session_data, f, indent=2)
+                        
+                        # 4. Restore question banks (optional)
+                        if "question_banks" in backup_data:
+                            for bank_path, bank_content in backup_data["question_banks"].items():
+                                bank_file = Path(bank_path)
+                                bank_file.parent.mkdir(parents=True, exist_ok=True)
+                                with open(bank_file, 'w') as f:
+                                    f.write(bank_content)
+                        
+                        st.success(f"✅ Master restore complete! Restored {len(backup_data.get('accounts', {}))} users.")
+                        st.balloons()
+                        time.sleep(2)
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Restore failed: {str(e)}")
+                        logger.error(f"Master restore error: {e}")
+        
+        with col_cancel:
+            if st.button("❌ Cancel", use_container_width=True):
+                st.rerun()
+    
+    st.divider()
+    
+    if not users:
+        st.info("No users found")
+    else:
     
     st.divider()
     
