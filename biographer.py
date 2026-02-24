@@ -348,7 +348,7 @@ try:
 except Exception as e:
     logger.error(f"Error loading CSS: {e}")
 
-LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo.png"
+LOGO_URL = "https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo-1.png"
 
 # ============================================================================
 # EMAIL CONFIG WITH PRODUCTION SAFEGUARDS
