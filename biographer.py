@@ -5900,6 +5900,12 @@ with tab2:
                     if 'overall_score' in fb and fb['overall_score']:
                         st.markdown(f"**Overall Score:** {fb['overall_score']}/10")
 
+# ========== ADD THIS VISIBLE SPACER ==========
+st.markdown("---")
+st.markdown("### 📊 Your Writing Statistics")
+st.markdown("<br>", unsafe_allow_html=True)
+# =============================================
+
 col1, col2, col3, col4 = st.columns(4)
 with col1: 
     st.metric("Total Words", sum(calculate_author_word_count(s["id"]) for s in SESSIONS))
