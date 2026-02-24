@@ -1467,359 +1467,145 @@ def show_privacy_settings():
     
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
-
 # ============================================================================
-# PERFECT COVER DESIGNER
+# SETTINGS PANEL (Combines Privacy & Backup)
 # ============================================================================
-def show_cover_designer():
+def show_settings_panel():
+    """Combined settings panel for Privacy and Backup"""
     st.markdown('<div class="modal-overlay">', unsafe_allow_html=True)
-    st.title("🎨 Cover Designer")
-    st.success("✅ Exports as HTML - Preview matches export exactly!")
     
-    if st.button("← Back", key="cover_back_btn"):
-        st.session_state.show_cover_designer = False
-        st.rerun()
-    
-    st.markdown("### Design your book cover - Portrait format (6\" x 9\")")
-    
-    saved_cover = st.session_state.user_account.get('cover_design', {}) if st.session_state.user_account else {}
-    
-    col1, col2 = st.columns(2)
-    
+    col1, col2 = st.columns([6, 1])
     with col1:
-        st.markdown("**Cover Options**")
-        
-        default_title = f"{st.session_state.user_account.get('profile', {}).get('first_name', 'My')}'s Story"
-        title = st.text_input("Book Title", value=saved_cover.get('title', default_title), key="cover_title_input")
-        
-        subtitle = st.text_input("Subtitle (optional)", value=saved_cover.get('subtitle', ''), 
-                                placeholder="A brief subtitle or tagline", key="cover_subtitle_input")
-        
-        default_author = f"{st.session_state.user_account.get('profile', {}).get('first_name', '')} {st.session_state.user_account.get('profile', {}).get('last_name', '')}".strip()
-        author = st.text_input("Author Name", value=saved_cover.get('author', default_author if default_author else "Author Name"), 
-                              key="cover_author_input")
-        
-        cover_options = ["Simple", "Elegant", "Modern", "Classic", "Vintage"]
-        cover_index = 0
-        saved_cover_type = saved_cover.get('cover_type', 'Simple')
-        if saved_cover_type in cover_options:
-            cover_index = cover_options.index(saved_cover_type)
-        cover_type = st.selectbox("Cover Style", cover_options, index=cover_index, key="cover_style_select")
-        
-        font_options = ["Georgia", "Arial", "Times New Roman", "Helvetica", "Calibri"]
-        font_index = 0
-        saved_font = saved_cover.get('title_font', 'Georgia')
-        if saved_font in font_options:
-            font_index = font_options.index(saved_font)
-        title_font = st.selectbox("Title Font", font_options, index=font_index, key="cover_font_select")
-        
-        title_color = st.color_picker("Title Color", value=saved_cover.get('title_color', '#000000'), key="cover_title_color")
-        background_color = st.color_picker("Background Color", value=saved_cover.get('background_color', '#FFFFFF'), key="cover_bg_color")
-        
-        if saved_cover.get('cover_html') and Path(saved_cover['cover_html']).exists():
-            st.markdown("**Current Cover HTML:**")
-            with open(saved_cover['cover_html'], 'r') as f:
-                html_content = f.read()
-            st.download_button(
-                label="📥 Download Current Cover HTML",
-                data=html_content,
-                file_name="my_cover.html",
-                mime="text/html",
-                use_container_width=True,
-                key="cover_download_current_btn"
-            )
-            st.markdown("---")
-            st.markdown("**Upload New Image (optional):**")
-        
-        uploaded_cover = st.file_uploader("Upload Cover Image (optional)", type=['jpg', 'jpeg', 'png'], 
-                                         key="cover_image_uploader")
-        if uploaded_cover:
-            st.image(uploaded_cover, caption="New cover image", width=250)
-    
+        st.title("⚙️ Settings")
     with col2:
-        st.markdown("**Preview (6\" x 9\" portrait) - This EXACT HTML will be saved**")
-        
-        if uploaded_cover:
-            img_bytes = uploaded_cover.getvalue()
-            img_base64 = base64.b64encode(img_bytes).decode()
-            use_image = True
-        elif saved_cover.get('cover_image') and Path(saved_cover['cover_image']).exists():
-            with open(saved_cover['cover_image'], 'rb') as f:
-                img_bytes = f.read()
-            img_base64 = base64.b64encode(img_bytes).decode()
-            use_image = True
-        else:
-            use_image = False
-            img_bytes = None
-        
-        if use_image:
-            subtitle_html = f'<h2 style="font-family:{title_font}, sans-serif; color:white; font-size:32px; margin:20px 0 0 0; text-shadow:3px 3px 6px black; font-weight:normal;">{subtitle}</h2>' if subtitle else ''
-            
-            cover_html = f'''
-            <div style="width:100%; max-width:600px; margin:0 auto; background:white; padding:20px;">
-                <div style="
-                    width:100%;
-                    aspect-ratio:600/900;
-                    background-image:url('data:image/jpeg;base64,{img_base64}');
-                    background-size:cover;
-                    background-position:center;
-                    border:2px solid #333;
-                    border-radius:10px;
-                    overflow:hidden;
-                    position:relative;
-                    box-shadow:0 10px 20px rgba(0,0,0,0.3);
-                ">
-                    <div style="
-                        position:absolute;
-                        top:0;
-                        left:0;
-                        width:100%;
-                        height:100%;
-                        background:rgba(0,0,0,0.25);
-                        display:flex;
-                        flex-direction:column;
-                        justify-content:space-between;
-                        padding:50px 30px;
-                        box-sizing:border-box;
-                    ">
-                        <div style="text-align:center;">
-                            <h1 style="font-family:{title_font}, sans-serif; color:white; font-size:72px; margin:0; text-shadow:4px 4px 8px black; line-height:1.2;">{title}</h1>
-                            {subtitle_html}
-                        </div>
-                        <div style="text-align:center; margin-bottom:50px;">
-                            <p style="font-family:{title_font}, sans-serif; color:white; font-size:36px; margin:0; text-shadow:3px 3px 6px black;">by {author}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            '''
-        else:
-            subtitle_html = f'<h2 style="font-family:{title_font}, sans-serif; color:{title_color}; font-size:32px; margin:20px 0 0 0; font-weight:normal;">{subtitle}</h2>' if subtitle else ''
-            
-            cover_html = f'''
-            <div style="width:100%; max-width:600px; margin:0 auto; background:white; padding:20px;">
-                <div style="
-                    width:100%;
-                    aspect-ratio:600/900;
-                    background-color:{background_color};
-                    border:2px solid #333;
-                    border-radius:10px;
-                    display:flex;
-                    flex-direction:column;
-                    justify-content:space-between;
-                    padding:50px 30px;
-                    box-sizing:border-box;
-                    box-shadow:0 10px 20px rgba(0,0,0,0.3);
-                ">
-                    <div style="text-align:center;">
-                        <h1 style="font-family:{title_font}, sans-serif; color:{title_color}; font-size:72px; margin:0; line-height:1.2;">{title}</h1>
-                        {subtitle_html}
-                    </div>
-                    <div style="text-align:center; margin-bottom:50px;">
-                        <p style="font-family:{title_font}, sans-serif; color:{title_color}; font-size:36px; margin:0;">by {author}</p>
-                    </div>
-                </div>
-            </div>
-            '''
-        
-        from streamlit.components.v1 import html
-        html(cover_html, height=800)
-        
-        st.caption("6\" wide × 9\" tall (portrait format) - This EXACT HTML will be saved")
+        if st.button("✕", key="close_settings_btn"):
+            st.session_state.show_settings = False
+            st.rerun()
     
-    if st.button("💾 Save Cover Design (as HTML)", key="save_cover_design_btn", type="primary", use_container_width=True):
-        with st.spinner("💾 Saving cover HTML..."):
-            try:
-                if use_image:
-                    subtitle_html_saved = f'<h2 style="font-family:{title_font}, sans-serif; color:white; font-size:32px; margin:20px 0 0 0; text-shadow:3px 3px 6px black; font-weight:normal;">{subtitle}</h2>' if subtitle else ''
-                    
-                    full_html = f'''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Book Cover - {title}</title>
-    <style>
-        body {{ margin:0; padding:0; display:flex; justify-content:center; align-items:center; min-height:100vh; background:#f0f0f0; }}
-        .cover-container {{ width:600px; height:900px; position:relative; }}
-        .cover {{
-            width:100%;
-            height:100%;
-            background-image:url('data:image/jpeg;base64,{img_base64}');
-            background-size:cover;
-            background-position:center;
-            border:2px solid #333;
-            border-radius:10px;
-            overflow:hidden;
-            position:relative;
-            box-shadow:0 10px 20px rgba(0,0,0,0.3);
-        }}
-        .overlay {{
-            position:absolute;
-            top:0;
-            left:0;
-            width:100%;
-            height:100%;
-            background:rgba(0,0,0,0.25);
-            display:flex;
-            flex-direction:column;
-            justify-content:space-between;
-            padding:50px 30px;
-            box-sizing:border-box;
-        }}
-        .title {{
-            font-family:{title_font}, sans-serif;
-            color:white;
-            font-size:72px;
-            margin:0;
-            text-shadow:4px 4px 8px black;
-            line-height:1.2;
-            text-align:center;
-        }}
-        .subtitle {{
-            font-family:{title_font}, sans-serif;
-            color:white;
-            font-size:32px;
-            margin:20px 0 0 0;
-            text-shadow:3px 3px 6px black;
-            font-weight:normal;
-            text-align:center;
-        }}
-        .author {{
-            font-family:{title_font}, sans-serif;
-            color:white;
-            font-size:36px;
-            margin:0;
-            text-shadow:3px 3px 6px black;
-            text-align:center;
-        }}
-    </style>
-</head>
-<body>
-    <div class="cover-container">
-        <div class="cover">
-            <div class="overlay">
-                <div>
-                    <div class="title">{title}</div>
-                    {subtitle_html_saved}
-                </div>
-                <div class="author">by {author}</div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>'''
-                else:
-                    subtitle_html_saved = f'<div class="subtitle">{subtitle}</div>' if subtitle else ''
-                    
-                    full_html = f'''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Book Cover - {title}</title>
-    <style>
-        body {{ margin:0; padding:0; display:flex; justify-content:center; align-items:center; min-height:100vh; background:#f0f0f0; }}
-        .cover-container {{ width:600px; height:900px; position:relative; }}
-        .cover {{
-            width:100%;
-            height:100%;
-            background-color:{background_color};
-            border:2px solid #333;
-            border-radius:10px;
-            display:flex;
-            flex-direction:column;
-            justify-content:space-between;
-            padding:50px 30px;
-            box-sizing:border-box;
-            box-shadow:0 10px 20px rgba(0,0,0,0.3);
-        }}
-        .title {{
-            font-family:{title_font}, sans-serif;
-            color:{title_color};
-            font-size:72px;
-            margin:0;
-            line-height:1.2;
-            text-align:center;
-        }}
-        .subtitle {{
-            font-family:{title_font}, sans-serif;
-            color:{title_color};
-            font-size:32px;
-            margin:20px 0 0 0;
-            font-weight:normal;
-            text-align:center;
-        }}
-        .author {{
-            font-family:{title_font}, sans-serif;
-            color:{title_color};
-            font-size:36px;
-            margin:0;
-            text-align:center;
-        }}
-    </style>
-</head>
-<body>
-    <div class="cover-container">
-        <div class="cover">
-            <div>
-                <div class="title">{title}</div>
-                {subtitle_html_saved}
-            </div>
-            <div class="author">by {author}</div>
-        </div>
-    </div>
-</body>
-</html>'''
-                
-                html_filename = f"uploads/covers/{st.session_state.user_id}_cover.html"
-                Path("uploads/covers").mkdir(parents=True, exist_ok=True)
-                with open(html_filename, 'w') as f:
-                    f.write(full_html)
-                
-                if 'cover_design' not in st.session_state.user_account:
-                    st.session_state.user_account['cover_design'] = {}
-                
-                st.session_state.user_account['cover_design'].update({
-                    "title": title,
-                    "subtitle": subtitle,
-                    "author": author,
-                    "cover_type": cover_type,
-                    "title_font": title_font,
-                    "title_color": title_color,
-                    "background_color": background_color,
-                    "cover_html": html_filename,
-                    "last_updated": datetime.now().isoformat()
-                })
-                
-                if uploaded_cover:
-                    img_path = f"uploads/covers/{st.session_state.user_id}_cover_bg.jpg"
-                    with open(img_path, 'wb') as f:
-                        f.write(uploaded_cover.getbuffer())
-                    st.session_state.user_account['cover_design']['cover_image'] = img_path
-                
-                save_account_data(st.session_state.user_account)
-                
-                st.success("✅ Cover HTML saved successfully!")
-                
-                st.download_button(
-                    label="📥 Download Cover HTML (open in browser to verify)",
-                    data=full_html,
-                    file_name=f"my_cover_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                    mime="text/html",
-                    use_container_width=True,
-                    key="cover_download_new_btn"
-                )
-                
-                st.balloons()
-                time.sleep(2)
-                st.rerun()
-                
-            except Exception as e:
-                logger.error(f"Error saving cover: {e}")
-                st.error(f"Error saving cover: {str(e)}")
+    tab1, tab2 = st.tabs(["🔒 Privacy & Security", "💾 Backup & Restore"])
+    
+    with tab1:
+        st.markdown("### Ethical AI & Data Privacy")
+        st.info("Your stories are private and secure. We use AI ethically to help you write better, never to train models on your personal data.")
+        
+        if 'privacy_settings' not in st.session_state.user_account:
+            st.session_state.user_account['privacy_settings'] = {
+                "profile_public": False, 
+                "stories_public": False, 
+                "allow_sharing": False,
+                "data_collection": True, 
+                "encryption": True
+            }
+        
+        privacy = st.session_state.user_account['privacy_settings']
+        
+        privacy['profile_public'] = st.checkbox(
+            "Make profile public", 
+            value=privacy.get('profile_public', False),
+            key="settings_profile_public_chk",
+            help="Allow others to see your basic profile information"
+        )
+        
+        privacy['stories_public'] = st.checkbox(
+            "Share stories publicly", 
+            value=privacy.get('stories_public', False),
+            key="settings_stories_public_chk",
+            help="Make your stories visible to the public (coming soon)"
+        )
+        
+        privacy['allow_sharing'] = st.checkbox(
+            "Allow sharing via link", 
+            value=privacy.get('allow_sharing', False),
+            key="settings_allow_sharing_chk",
+            help="Generate shareable links to your stories"
+        )
+        
+        privacy['data_collection'] = st.checkbox(
+            "Allow anonymous usage data", 
+            value=privacy.get('data_collection', True),
+            key="settings_data_collection_chk",
+            help="Help us improve by sharing anonymous usage statistics"
+        )
+        
+        privacy['encryption'] = st.checkbox(
+            "Enable encryption", 
+            value=privacy.get('encryption', True),
+            key="settings_encryption_chk",
+            disabled=True, 
+            help="Your data is always encrypted at rest"
+        )
+        
+        st.markdown("---")
+        st.markdown("### 🔐 Security")
+        st.markdown("- All data encrypted at rest")
+        st.markdown("- No third-party data sharing")
+        st.markdown("- You own all your content")
+        st.markdown("- AI analysis is temporary and private")
+        
+        if st.button("💾 Save Privacy Settings", key="settings_save_privacy_btn", type="primary", use_container_width=True):
+            save_account_data(st.session_state.user_account)
+            st.success("Privacy settings saved!")
+            time.sleep(1)
+            st.rerun()
+    
+    with tab2:
+        st.markdown("### 💾 Backup & Restore")
+        
+        st.markdown("**Create a complete backup of all your data:**")
+        backup_json = create_backup()
+        if backup_json:
+            st.download_button(
+                label="📥 Download Complete Backup",
+                data=backup_json,
+                file_name=f"tell_my_story_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json",
+                use_container_width=True,
+                key="settings_download_backup_btn"
+            )
+        
+        st.markdown("---")
+        st.markdown("**Restore from backup:**")
+        backup_file = st.file_uploader("Upload backup file", type=['json'], key="settings_restore_uploader")
+        
+        if backup_file:
+            file_size_kb = len(backup_file.getvalue()) / 1024
+            st.info(f"📄 Selected: {backup_file.name} ({file_size_kb:.1f} KB)")
+            st.warning("⚠️ **WARNING:** This will COMPLETELY OVERWRITE all your current stories and profile data. This action CANNOT be undone!")
+            
+            if st.button("🔄 RESTORE BACKUP (I understand the risk)", key="settings_restore_backup_btn", type="primary", use_container_width=True):
+                with st.spinner("Restoring your data..."):
+                    try:
+                        backup_content = backup_file.read().decode('utf-8')
+                        if restore_from_backup(backup_content):
+                            st.success("✅ Backup restored successfully! Your data has been recovered.")
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to restore backup. File may be corrupted or for wrong user.")
+                    except Exception as e:
+                        logger.error(f"Restore error: {e}")
+                        st.error(f"❌ Error: {str(e)}")
+        
+        st.markdown("---")
+        st.markdown("**Previous backups:**")
+        backups = list_backups()
+        if backups:
+            for b in backups:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.text(f"📅 {b['date']} ({(b['size']/1024):.1f} KB)")
+                with col2:
+                    if st.button(f"Restore", key=f"settings_restore_{b['filename']}"):
+                        st.warning("⚠️ This will overwrite ALL current data!")
+                        if st.button(f"✅ CONFIRM", key=f"settings_confirm_{b['filename']}"):
+                            with open(f"backups/{b['filename']}", 'r') as f:
+                                backup_content = f.read()
+                            if restore_from_backup(backup_content):
+                                st.success("✅ Restored successfully!")
+                                st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
-
 # ============================================================================
 # NARRATIVE GPS HELPER FUNCTIONS
 # ============================================================================
@@ -4141,91 +3927,90 @@ if st.session_state.get('show_profile_setup', False):
     render_enhanced_profile()
     st.divider()
     
-    with st.expander("🔒 Privacy & Security Settings", expanded=False):
-        if 'privacy_settings' not in st.session_state.user_account:
-            st.session_state.user_account['privacy_settings'] = {
-                "profile_public": False, "stories_public": False, "allow_sharing": False,
-                "data_collection": True, "encryption": True
-            }
-        
-        privacy = st.session_state.user_account['privacy_settings']
-        
-        privacy['profile_public'] = st.checkbox("Make profile public", value=privacy.get('profile_public', False),
-                                               key="privacy_profile_public_chk",
-                                               help="Allow others to see your basic profile information")
-        privacy['stories_public'] = st.checkbox("Share stories publicly", value=privacy.get('stories_public', False),
-                                               key="privacy_stories_public_chk",
-                                               help="Make your stories visible to the public (coming soon)")
-        privacy['allow_sharing'] = st.checkbox("Allow sharing via link", value=privacy.get('allow_sharing', False),
-                                              key="privacy_allow_sharing_chk",
-                                              help="Generate shareable links to your stories")
-        privacy['data_collection'] = st.checkbox("Allow anonymous usage data", value=privacy.get('data_collection', True),
-                                                key="privacy_data_collection_chk",
-                                                help="Help us improve by sharing anonymous usage statistics")
-        
-        st.markdown("**🔐 Security Status:** Your data is encrypted at rest and never shared with third parties.")
-        
-        if st.button("💾 Save Privacy Settings", key="save_privacy_settings_btn", type="primary", use_container_width=True):
-            save_account_data(st.session_state.user_account)
-            st.success("Privacy settings saved!")
-            st.rerun()
+with st.expander("🔒 Privacy & Security Settings", expanded=False):
+    if 'privacy_settings' not in st.session_state.user_account:
+        st.session_state.user_account['privacy_settings'] = {
+            "profile_public": False, "stories_public": False, "allow_sharing": False,
+            "data_collection": True, "encryption": True
+        }
     
-    st.divider()
+    privacy = st.session_state.user_account['privacy_settings']
     
-    with st.expander("💾 Backup & Restore", expanded=False):
-        st.markdown("**Create a complete backup of all your data:**")
-        backup_json = create_backup()
-        if backup_json:
-            st.download_button(
-                label="📥 Download Complete Backup",
-                data=backup_json,
-                file_name=f"tell_my_story_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                mime="application/json",
-                use_container_width=True,
-                key="download_backup_btn"
-            )
-        
-        st.markdown("---")
-        st.markdown("**Restore from backup:**")
-        backup_file = st.file_uploader("Upload backup file", type=['json'], key="restore_uploader")
-        
-        if backup_file:
-            file_size_kb = len(backup_file.getvalue()) / 1024
-            st.info(f"📄 Selected: {backup_file.name} ({file_size_kb:.1f} KB)")
-            st.warning("⚠️ **WARNING:** This will COMPLETELY OVERWRITE all your current stories and profile data. This action CANNOT be undone!")
-            
-            if st.button("🔄 RESTORE BACKUP (I understand the risk)", key="restore_backup_btn", type="primary", use_container_width=True):
-                with st.spinner("Restoring your data..."):
-                    try:
-                        backup_content = backup_file.read().decode('utf-8')
-                        if restore_from_backup(backup_content):
-                            st.success("✅ Backup restored successfully! Your data has been recovered.")
-                            time.sleep(2)
-                            st.rerun()
-                        else:
-                            st.error("❌ Failed to restore backup. File may be corrupted or for wrong user.")
-                    except Exception as e:
-                        logger.error(f"Restore error: {e}")
-                        st.error(f"❌ Error: {str(e)}")
-        
-        st.markdown("---")
-        st.markdown("**Previous backups:**")
-        backups = list_backups()
-        if backups:
-            for b in backups:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.text(f"📅 {b['date']} ({(b['size']/1024):.1f} KB)")
-                with col2:
-                    if st.button(f"Restore", key=f"restore_{b['filename']}"):
-                        st.warning("⚠️ This will overwrite ALL current data!")
-                        if st.button(f"✅ CONFIRM Restore {b['filename']}", key=f"confirm_{b['filename']}"):
-                            with open(f"backups/{b['filename']}", 'r') as f:
-                                backup_content = f.read()
-                            if restore_from_backup(backup_content):
-                                st.success("✅ Restored successfully!")
-                                st.rerun()
+    privacy['profile_public'] = st.checkbox("Make profile public", value=privacy.get('profile_public', False),
+                                           key="privacy_profile_public_chk",
+                                           help="Allow others to see your basic profile information")
+    privacy['stories_public'] = st.checkbox("Share stories publicly", value=privacy.get('stories_public', False),
+                                           key="privacy_stories_public_chk",
+                                           help="Make your stories visible to the public (coming soon)")
+    privacy['allow_sharing'] = st.checkbox("Allow sharing via link", value=privacy.get('allow_sharing', False),
+                                          key="privacy_allow_sharing_chk",
+                                          help="Generate shareable links to your stories")
+    privacy['data_collection'] = st.checkbox("Allow anonymous usage data", value=privacy.get('data_collection', True),
+                                            key="privacy_data_collection_chk",
+                                            help="Help us improve by sharing anonymous usage statistics")
+    
+    st.markdown("**🔐 Security Status:** Your data is encrypted at rest and never shared with third parties.")
+    
+    if st.button("💾 Save Privacy Settings", key="save_privacy_settings_btn", type="primary", use_container_width=True):
+        save_account_data(st.session_state.user_account)
+        st.success("Privacy settings saved!")
+        st.rerun()
 
+st.divider()
+
+with st.expander("💾 Backup & Restore", expanded=False):
+    st.markdown("**Create a complete backup of all your data:**")
+    backup_json = create_backup()
+    if backup_json:
+        st.download_button(
+            label="📥 Download Complete Backup",
+            data=backup_json,
+            file_name=f"tell_my_story_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            mime="application/json",
+            use_container_width=True,
+            key="download_backup_btn"
+        )
+    
+    st.markdown("---")
+    st.markdown("**Restore from backup:**")
+    backup_file = st.file_uploader("Upload backup file", type=['json'], key="restore_uploader")
+    
+    if backup_file:
+        file_size_kb = len(backup_file.getvalue()) / 1024
+        st.info(f"📄 Selected: {backup_file.name} ({file_size_kb:.1f} KB)")
+        st.warning("⚠️ **WARNING:** This will COMPLETELY OVERWRITE all your current stories and profile data. This action CANNOT be undone!")
+        
+        if st.button("🔄 RESTORE BACKUP (I understand the risk)", key="restore_backup_btn", type="primary", use_container_width=True):
+            with st.spinner("Restoring your data..."):
+                try:
+                    backup_content = backup_file.read().decode('utf-8')
+                    if restore_from_backup(backup_content):
+                        st.success("✅ Backup restored successfully! Your data has been recovered.")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to restore backup. File may be corrupted or for wrong user.")
+                except Exception as e:
+                    logger.error(f"Restore error: {e}")
+                    st.error(f"❌ Error: {str(e)}")
+    
+    st.markdown("---")
+    st.markdown("**Previous backups:**")
+    backups = list_backups()
+    if backups:
+        for b in backups:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.text(f"📅 {b['date']} ({(b['size']/1024):.1f} KB)")
+            with col2:
+                if st.button(f"Restore", key=f"restore_{b['filename']}"):
+                    st.warning("⚠️ This will overwrite ALL current data!")
+                    if st.button(f"✅ CONFIRM Restore {b['filename']}", key=f"confirm_{b['filename']}"):
+                        with open(f"backups/{b['filename']}", 'r') as f:
+                            backup_content = f.read()
+                        if restore_from_backup(backup_content):
+                            st.success("✅ Restored successfully!")
+                            st.rerun()
 # ============================================================================
 # MODAL HANDLING
 # ============================================================================
@@ -4244,10 +4029,6 @@ if st.session_state.get('show_admin', False):
 
 if st.session_state.show_privacy_settings:
     show_privacy_settings()
-    st.stop()
-
-if st.session_state.show_cover_designer:
-    show_cover_designer()
     st.stop()
 
 if st.session_state.show_bank_manager:
@@ -4390,11 +4171,17 @@ with st.sidebar:
     
     if st.button("🚪 Log Out", key="logout_btn", use_container_width=True): 
         logout_user()
-
+    
+    st.divider()
+    
+    # SETTINGS BUTTON
+    if st.button("⚙️ Settings", key="settings_btn", use_container_width=True):
+        st.session_state.show_settings = True
+        st.rerun()
+    
     # ADMIN BUTTON - Only shows for your email
     if st.session_state.logged_in and st.session_state.user_account:
         if st.session_state.user_account.get('email') == "davidellis@gmx.es":
-            st.divider()
             if st.button("👑 Admin Panel", key="admin_btn", use_container_width=True):
                 st.session_state.show_admin = True
                 st.rerun()
@@ -4460,11 +4247,7 @@ with st.sidebar:
         if st.button("🔒 Privacy", key="privacy_tool_btn", use_container_width=True):
             st.session_state.show_privacy_settings = True
             st.rerun()
-    with col2:
-        if st.button("🎨 Cover", key="cover_tool_btn", use_container_width=True):
-            st.session_state.show_cover_designer = True
-            st.rerun()
-    
+       
     st.divider()
     st.header("📚 Question Banks")
     if st.button("📋 Bank Manager", key="bank_manager_sidebar_btn", use_container_width=True, type="primary"): 
