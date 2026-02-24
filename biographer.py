@@ -3995,6 +3995,7 @@ if st.session_state.show_session_creator:
 # Initialize session state for sidebar visibility if not exists
 if 'sidebar_hidden' not in st.session_state:
     st.session_state.sidebar_hidden = False
+
 # Apply sidebar visibility based on session state
 if st.session_state.sidebar_hidden:
     st.markdown("""
@@ -4015,20 +4016,18 @@ if st.session_state.sidebar_hidden:
     </style>
     """, unsafe_allow_html=True)
 
-col_logo, col_title, col_focus, col_support = st.columns([1, 2, 1, 1])
+col_logo, col_focus, col_support = st.columns([1, 1, 1])
 with col_logo:
-    st.markdown(f'<img src="{LOGO_URL}" class="logo-img" style="max-width:100px;">', unsafe_allow_html=True)
-with col_title:
-    st.markdown('<h1 style="margin-top:20px;">Tell My Story</h1>', unsafe_allow_html=True)
+    st.markdown(f'<img src="https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo-1.png" style="max-width:150px;">', unsafe_allow_html=True)
 with col_focus:
-    st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
+    st.markdown('<div style="margin-top:10px;">', unsafe_allow_html=True)
     button_label = "📖 EXIT FOCUS" if st.session_state.sidebar_hidden else "🧘 FOCUS MODE"
     if st.button(button_label, key="focus_btn", type="primary", use_container_width=True):
         st.session_state.sidebar_hidden = not st.session_state.sidebar_hidden
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 with col_support:
-    st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
+    st.markdown('<div style="margin-top:10px;">', unsafe_allow_html=True)
     if st.button("❓ Help", key="help_btn", type="primary", use_container_width=True):
         st.session_state.show_support = not st.session_state.get('show_support', False)
         st.rerun()
