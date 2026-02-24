@@ -4377,7 +4377,7 @@ if st.session_state.get('show_support', False):
 # ============================================================================
 with st.sidebar:
 
-    st.markdown('<div class="sidebar-header"><h2>Click Focus Mode to Hide Sidebar d</h2><p>Your Life Timeline</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-header"><h2>Click Focus Mode to Hide Sidebar >></h2></div>', unsafe_allow_html=True)
        
     st.header("👤 Your Profile")
     if st.session_state.user_account:
