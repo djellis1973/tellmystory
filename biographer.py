@@ -290,7 +290,7 @@ def add_simple_recording_button():
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎥 Record Demo")
-    st.sidebar.components.v1.html(recording_html, height=200)
+    st.components.v1.html(recording_html, height=200)
         
 # ============================================================================
 # IMPORTS WITH ERROR HANDLING
