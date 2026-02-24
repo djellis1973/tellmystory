@@ -3757,10 +3757,7 @@ def show_admin_panel():
     if not users:
         st.info("No users found")
     else:
-    
-    if not users:
-        st.info("No users found")
-    else:
+        
         # Create tabs for different views
         tab1, tab2, tab3 = st.tabs(["📋 User List", "📊 Analytics", "🗑️ Delete Users"])
         
