@@ -3971,7 +3971,7 @@ if st.session_state.sidebar_hidden:
 
 col_logo, col_focus, col_support = st.columns([1, 1, 1])
 with col_logo:
-    st.markdown(f'<img src="https://menuhunterai.com/wp-content/uploads/2026/02/tms_logo-1.png" style="max-width:250px;">', unsafe_allow_html=True)
+    st.markdown(f'<img src="https://menuhunterai.com/wp-content/uploads/2026/02/tellmesorynewlogo.png" style="max-width:250px;">', unsafe_allow_html=True)
 with col_focus:
     st.markdown('<div style="margin-top:10px;">', unsafe_allow_html=True)
     button_label = "📖 EXIT FOCUS" if st.session_state.sidebar_hidden else "🧘 FOCUS MODE"
