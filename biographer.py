@@ -3646,8 +3646,7 @@ def show_admin_panel():
     
     # Summary stats
     st.write(f"**Total Users:** {len(users)}")
-    st.markdown("<br><br><br><br><br><br>", unsafe_alloc_html=True)
-    col1, col2, col3, col4 = st.columns(4)
+       col1, col2, col3, col4 = st.columns(4)
     with col1:
         active_last_7 = sum(1 for u in users if u['days_since_login'] != 'N/A' and u['days_since_login'] <= 7)
         st.metric("Active (7 days)", active_last_7)
