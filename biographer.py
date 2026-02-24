@@ -218,15 +218,160 @@ validate_environment()
 # ADD RECORDING FUNCTION HERE (LINE 575)
 # ============================================================================
 def add_simple_recording_button():
-    """Simple one-time recording button"""
+    """Simple browser-based screen recording with guaranteed download"""
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎥 Record Demo")
     
-    if st.sidebar.button("🔴 Start Recording"):
-        st.sidebar.info("Recording... Press R to stop")
-        st.components.v1.html("""
-        <script>window.parent.postMessage({type:"streamlit:start_recording"},"*");</script>
-        """, height=0)
+    recording_html = """
+    <div style="text-align: center; font-family: Arial, sans-serif;">
+        <button onclick="startRecording()" style="background-color: #ff4444; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-bottom: 10px; width: 100%;">🔴 START RECORDING</button>
+        <button onclick="stopRecording()" style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%;">⏹️ STOP & DOWNLOAD</button>
+        <div id="recordingStatus" style="margin-top: 10px; padding: 8px; border-radius: 4px; font-size: 14px;"></div>
+        <div id="downloadLink" style="margin-top: 10px;"></div>
+    </div>
+    
+    <script>
+    let mediaRecorder;
+    let recordedChunks = [];
+
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: true
+            });
+            
+            mediaRecorder = new MediaRecorder(stream);
+            recordedChunks = [];
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, {
+                    type: 'video/webm'
+                });
+                
+                // Create download link
+                const url = URL.createObjectURL(blob);
+                const filename = 'demo_recording_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.webm';
+                
+                // Show download button
+                const downloadDiv = document.getElementById('downloadLink');
+                downloadDiv.innerHTML = '<a href="' + url + '" download="' + filename + '" style="background-color: #3498db; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 10px;">📥 CLICK HERE TO DOWNLOAD VIDEO</a>';
+                
+                document.getElementById('recordingStatus').innerHTML = '✅ Recording complete! Click the button above to save.';
+                
+                // Auto-trigger download as backup
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            mediaRecorder.start();
+            document.getElementById('recordingStatus').innerHTML = '🔴 Recording in progress... Click STOP when done';
+            document.getElementById('recordingStatus').style.backgroundColor = '#ffeeee';
+        } catch (err) {
+            document.getElementById('recordingStatus').innerHTML = '❌ Error: ' + err.message;
+            document.getElementById('recordingStatus').style.backgroundColor = '#ffdddd';
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            document.getElementById('recordingStatus').innerHTML = '⏹️ Processing recording...';
+            document.getElementById('recordingStatus').style.backgroundColor = '#ffffdd';
+        }
+    }
+    </script>
+    """
+    
+    st.sidebar.components.v1.html(recording_html, height=200)def add_simple_recording_button():
+    """Simple browser-based screen recording with guaranteed download"""
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎥 Record Demo")
+    
+    recording_html = """
+    <div style="text-align: center; font-family: Arial, sans-serif;">
+        <button onclick="startRecording()" style="background-color: #ff4444; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-bottom: 10px; width: 100%;">🔴 START RECORDING</button>
+        <button onclick="stopRecording()" style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%;">⏹️ STOP & DOWNLOAD</button>
+        <div id="recordingStatus" style="margin-top: 10px; padding: 8px; border-radius: 4px; font-size: 14px;"></div>
+        <div id="downloadLink" style="margin-top: 10px;"></div>
+    </div>
+    
+    <script>
+    let mediaRecorder;
+    let recordedChunks = [];
+
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: true
+            });
+            
+            mediaRecorder = new MediaRecorder(stream);
+            recordedChunks = [];
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, {
+                    type: 'video/webm'
+                });
+                
+                // Create download link
+                const url = URL.createObjectURL(blob);
+                const filename = 'demo_recording_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.webm';
+                
+                // Show download button
+                const downloadDiv = document.getElementById('downloadLink');
+                downloadDiv.innerHTML = '<a href="' + url + '" download="' + filename + '" style="background-color: #3498db; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 10px;">📥 CLICK HERE TO DOWNLOAD VIDEO</a>';
+                
+                document.getElementById('recordingStatus').innerHTML = '✅ Recording complete! Click the button above to save.';
+                
+                // Auto-trigger download as backup
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            mediaRecorder.start();
+            document.getElementById('recordingStatus').innerHTML = '🔴 Recording in progress... Click STOP when done';
+            document.getElementById('recordingStatus').style.backgroundColor = '#ffeeee';
+        } catch (err) {
+            document.getElementById('recordingStatus').innerHTML = '❌ Error: ' + err.message;
+            document.getElementById('recordingStatus').style.backgroundColor = '#ffdddd';
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            document.getElementById('recordingStatus').innerHTML = '⏹️ Processing recording...';
+            document.getElementById('recordingStatus').style.backgroundColor = '#ffffdd';
+        }
+    }
+    </script>
+    """
+    
+    st.sidebar.components.v1.html(recording_html, height=200)
         
 # ============================================================================
 # IMPORTS WITH ERROR HANDLING
