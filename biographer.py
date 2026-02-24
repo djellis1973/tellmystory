@@ -3895,7 +3895,7 @@ if st.session_state.get('show_profile_setup', False):
     """, unsafe_allow_html=True)
     
     st.markdown('<div class="profile-setup-modal">', unsafe_allow_html=True)
-    st.title("👤 Your Complete Life Story Profile"
+    st.title("👤 Your Complete Life Story Profile")
     st.markdown("### 📝 Basic Information")
     with st.form("profile_setup_form"):
         col1, col2 = st.columns(2)
