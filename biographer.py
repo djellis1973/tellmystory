@@ -5899,39 +5899,6 @@ with tab2:
                     if 'overall_score' in fb and fb['overall_score']:
                         st.markdown(f"**Overall Score:** {fb['overall_score']}/10")
 
-# ============================================================================
-# SESSION PROGRESS
-# ============================================================================
-progress_info = get_progress_info(current_session_id)
-st.markdown(f"""
-<div class="progress-container">
-<div class="progress-header">📊 Session Progress</div>
-<div class="progress-status">{progress_info['emoji']} {progress_info['progress_percent']:.0f}% complete • {progress_info['remaining_words']} words remaining</div>
-<div class="progress-bar-container"><div class="progress-bar-fill" style="width: {min(progress_info['progress_percent'], 100)}%; background-color: {progress_info['color']};"></div></div>
-<div class="progress-stats">{progress_info['current_count']} / {progress_info['target']} words</div>
-</div>
-""", unsafe_allow_html=True)
-
-if st.button("✏️ Change Word Target", key="edit_target", use_container_width=True): 
-    st.session_state.editing_word_target = not st.session_state.editing_word_target
-    st.rerun()
-
-if st.session_state.editing_word_target:
-    new_target = st.number_input("Target words:", min_value=100, max_value=5000, value=progress_info['target'], key="target_edit")
-    col_s, col_c = st.columns(2)
-    with col_s:
-        if st.button("💾 Save", key="save_target", type="primary", use_container_width=True):
-            st.session_state.responses[current_session_id]["word_target"] = new_target
-            save_user_data(st.session_state.user_id, st.session_state.responses)
-            st.session_state.editing_word_target = False
-            st.rerun()
-    with col_c:
-        if st.button("❌ Cancel", key="cancel_target", use_container_width=True): 
-            st.session_state.editing_word_target = False
-            st.rerun()
-
-st.divider()
-
 col1, col2, col3, col4 = st.columns(4)
 with col1: 
     st.metric("Total Words", sum(calculate_author_word_count(s["id"]) for s in SESSIONS))
