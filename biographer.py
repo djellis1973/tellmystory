@@ -4293,36 +4293,27 @@ if st.session_state.show_session_creator:
 # ============================================================================
 # MAIN HEADER WITH PROMINENT SUPPORT BUTTON
 # ============================================================================
-col_logo, col_title, col_support = st.columns([1, 3, 1])
-with col_logo:
-    st.markdown(f'<img src="{LOGO_URL}" class="logo-img" style="max-width:100px;">', unsafe_allow_html=True)
-with col_title:
-    st.markdown('<h1 style="margin-top:20px;">Tell My Story</h1>', unsafe_allow_html=True)
-with col_support:
-    st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
-    if st.button("❓ Help", key="help_btn", type="primary", use_container_width=True):
-        st.session_state.show_support = not st.session_state.get('show_support', False)
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# Add near your logo/title area
 col_logo, col_title, col_focus, col_support = st.columns([1, 2, 1, 1])
 with col_logo:
     st.markdown(f'<img src="{LOGO_URL}" class="logo-img" style="max-width:100px;">', unsafe_allow_html=True)
 with col_title:
     st.markdown('<h1 style="margin-top:20px;">Tell My Story</h1>', unsafe_allow_html=True)
 with col_focus:
-    if st.button("🧘 FOCUS MODE", type="primary", use_container_width=True):
+    st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
+    if st.button("🧘 FOCUS MODE", key="focus_btn", type="primary", use_container_width=True):
         st.markdown("""
         <style>
         section[data-testid="stSidebar"] { display: none !important; }
         </style>
         """, unsafe_allow_html=True)
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 with col_support:
+    st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
     if st.button("❓ Help", key="help_btn", type="primary", use_container_width=True):
         st.session_state.show_support = not st.session_state.get('show_support', False)
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================================
 # SUPPORT SECTION - Show when help button clicked
