@@ -526,14 +526,15 @@ To the maximum extent permitted by law, Tell My Story and its creators shall not
         }
         </style>
         """, unsafe_allow_html=True)
-        
-        # Header
+
+          # Header
         st.markdown("""
-        <div class="support-header">
-            <h1>📚 Help & Support</h1>
-            <p>Find answers, guides, and information about how your stories are protected</p>
-        </div>
+        <h1 style="color: #000000; text-align: center;">📚 Help & Support</h1>
+        <p style="color: #000000; text-align: center;">Find answers, guides, and information about how your stories are protected</p>
+        <hr>
         """, unsafe_allow_html=True)
+        
+
         
         # Create tabs for different support sections
         tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
