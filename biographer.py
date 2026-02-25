@@ -632,16 +632,43 @@ def render_gamification_dashboard():
                 else:
                     st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{label}</span></div>', unsafe_allow_html=True)
         
-        for milestone in ['first_story', 'seven_day', 'five_thousand', 'first_session']:
-            flag = f"milestone_achieved_{milestone}"
-            if st.session_state.get(flag):
-                st.balloons()
-                st.success(f"🎉 Achieved: {dict(milestones_list)[milestone]}!")
-                st.session_state[flag] = False
-                time.sleep(2)
-                st.rerun()
-    except Exception as e:
-        logger.error(f"Error rendering gamification dashboard: {e}")
+# Check for new milestone achievements without balloons on every render
+for milestone_key, milestone_label, achieved in milestones_list:
+    flag = f"milestone_achieved_{milestone_key}"
+    
+    # Only show celebration ONCE when milestone is first achieved
+    if achieved and not st.session_state.user_account['streak_data']['milestones'].get(milestone_key, False):
+        # This is a new milestone - celebrate!
+        st.balloons()
+        st.success(f"🎉 Congratulations! You've achieved: {milestone_label}!")
+        
+        # Update the milestone in the account data
+        st.session_state.user_account['streak_data']['milestones'][milestone_key] = True
+        save_account_data(st.session_state.user_account)
+        
+        # Set a flag to prevent multiple celebrations
+        st.session_state[f"celebrated_{milestone_key}"] = True
+        
+        # Add a small delay and rerun
+        time.sleep(2)
+        st.rerun()
+    
+    # Show achievement status in dashboard (without balloons)
+    if achieved:
+        st.markdown(f'<div class="milestone-item"><span class="milestone-check">✅</span><span class="milestone-text">{milestone_label}</span></div>', unsafe_allow_html=True)
+    else:
+        # Show progress bars for incomplete milestones
+        if milestone_key == "first_story":
+            progress = min(100, int((total_words / 100) * 100))
+            st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{milestone_label} ({progress}%)</span></div>', unsafe_allow_html=True)
+        elif milestone_key == "seven_day_streak":
+            progress = min(100, int((current_streak / 7) * 100))
+            st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{milestone_label} ({progress}%)</span></div>', unsafe_allow_html=True)
+        elif milestone_key == "five_thousand_words":
+            progress = min(100, int((total_words / 5000) * 100))
+            st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{milestone_label} ({progress}%)</span></div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{milestone_label}</span></div>', unsafe_allow_html=True)
 
 # ============================================================================
 # HISTORICAL EVENTS HELPER
