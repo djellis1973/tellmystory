@@ -609,6 +609,7 @@ def render_gamification_dashboard():
         
         st.markdown("### ✨ Milestones")
         
+        # Define milestones list
         milestones_list = [
             ("first_story", "📖 First Story (100 words)", milestones.get('first_story', False)),
             ("seven_day_streak", "🔥 7-Day Streak", milestones.get('seven_day_streak', False)),
@@ -616,34 +617,8 @@ def render_gamification_dashboard():
             ("first_session_complete", "✅ Complete First Session", milestones.get('first_session_complete', False))
         ]
         
-        for key, label, achieved in milestones_list:
-            if achieved:
-                st.markdown(f'<div class="milestone-item"><span class="milestone-check">✅</span><span class="milestone-text">{label}</span></div>', unsafe_allow_html=True)
-            else:
-                if key == "first_story":
-                    progress = min(100, int((total_words / 100) * 100))
-                    st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{label} ({progress}%)</span></div>', unsafe_allow_html=True)
-                elif key == "seven_day_streak":
-                    progress = min(100, int((current_streak / 7) * 100))
-                    st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{label} ({progress}%)</span></div>', unsafe_allow_html=True)
-                elif key == "five_thousand_words":
-                    progress = min(100, int((total_words / 5000) * 100))
-                    st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{label} ({progress}%)</span></div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{label}</span></div>', unsafe_allow_html=True)
-        
-        # Define milestones list inside the function
-        milestones_list = [
-            ("first_story", "📖 First Story (100 words)", milestones.get('first_story', False)),
-            ("seven_day_streak", "🔥 7-Day Streak", milestones.get('seven_day_streak', False)),
-            ("five_thousand_words", "📚 5,000 Total Words", milestones.get('five_thousand_words', False)),
-            ("first_session_complete", "✅ Complete First Session", milestones.get('first_session_complete', False))
-        ]
-        
-        # Check for new milestone achievements without balloons on every render
+        # Check for new milestone achievements and display them
         for milestone_key, milestone_label, achieved in milestones_list:
-            flag = f"milestone_achieved_{milestone_key}"
-            
             # Only show celebration ONCE when milestone is first achieved
             if achieved and not st.session_state.user_account['streak_data']['milestones'].get(milestone_key, False):
                 # This is a new milestone - celebrate!
@@ -661,7 +636,7 @@ def render_gamification_dashboard():
                 time.sleep(2)
                 st.rerun()
             
-            # Show achievement status in dashboard (without balloons)
+            # Show achievement status in dashboard
             if achieved:
                 st.markdown(f'<div class="milestone-item"><span class="milestone-check">✅</span><span class="milestone-text">{milestone_label}</span></div>', unsafe_allow_html=True)
             else:
@@ -677,7 +652,9 @@ def render_gamification_dashboard():
                     st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{milestone_label} ({progress}%)</span></div>', unsafe_allow_html=True)
                 else:
                     st.markdown(f'<div class="milestone-item"><span class="milestone-check">⭕</span><span class="milestone-text">{milestone_label}</span></div>', unsafe_allow_html=True)
-
+                    
+    except Exception as e:
+        logger.error(f"Error in render_gamification_dashboard: {e}")
 # ============================================================================
 # HISTORICAL EVENTS HELPER
 # ============================================================================
